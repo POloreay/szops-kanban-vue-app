@@ -1,15 +1,19 @@
 <template>
   <div class="app-layout">
-    <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
-    <div class="app-main">
-      <AppHeader @toggle="collapsed = !collapsed" />
-      <main class="app-content">
-        <router-view />
-      </main>
-    </div>
-    <TaskFormModal v-model="showNewTask" :editing="editingTask" />
-    <TaskDrawer :task="drawerTask" @close="drawerTask = null" />
-    <TodoNotice />
+    <!-- 登录强验证：未登录时全屏登录门，不渲染任何系统内容 -->
+    <LoginGate v-if="!userStore.currentUser" />
+    <template v-else>
+      <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
+      <div class="app-main">
+        <AppHeader @toggle="collapsed = !collapsed" />
+        <main class="app-content">
+          <router-view />
+        </main>
+      </div>
+      <TaskFormModal v-model="showNewTask" :editing="editingTask" />
+      <TaskDrawer :task="drawerTask" @close="drawerTask = null" />
+      <TodoNotice />
+    </template>
   </div>
 </template>
 
@@ -18,6 +22,7 @@ import { ref, computed, onMounted, provide, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import AppHeader from './components/layout/AppHeader.vue'
+import LoginGate from './components/layout/LoginGate.vue'
 import TaskFormModal from './components/kanban/TaskFormModal.vue'
 import TaskDrawer from './components/kanban/TaskDrawer.vue'
 import TodoNotice from './components/layout/TodoNotice.vue'
