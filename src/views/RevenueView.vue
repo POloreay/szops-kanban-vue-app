@@ -96,23 +96,17 @@
 import { computed, ref, inject } from 'vue'
 import { useTaskStore } from '../stores/taskStore'
 import ProjectMultiSelect from '../components/kanban/ProjectMultiSelect.vue'
-import { activeTasks, revenueRows, totalContract, totalCollection, fmtWan, num, matchYearMonth } from '../utils/finance'
+import { activeTasks, revenueRows, totalContract, totalCollection, fmtWan, num, matchYearMonth, yearOptions } from '../utils/finance'
 
 const taskStore = useTaskStore()
 const openDrawer = inject('openTaskDrawer', () => {})
 
 const active = computed(() => activeTasks(taskStore.tasks))
 
-// 年度/月度筛选
+// 年度/月度筛选（项目创建日期口径）
 const year = ref(String(new Date().getFullYear()))
 const month = ref('all')
-const years = computed(() => {
-  const ys = [...new Set(active.value.map(t => {
-    const d = t.deadline || (t.projectInfo && t.projectInfo.createdDate) || ''
-    return String(d).replace(/\//g, '-').slice(0, 4)
-  }).filter(Boolean))]
-  return ys.sort()
-})
+const years = computed(() => yearOptions(active.value))
 const filteredActive = computed(() => active.value.filter(t => matchYearMonth(t, year.value, month.value)))
 
 // ===== 项目维度筛选（实施环节项目多选）=====

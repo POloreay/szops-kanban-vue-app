@@ -236,25 +236,58 @@ export function ownerTopN(tasks, n = 5) {
     .slice(0, n)
 }
 
-// 逾期风险榜（逾期天数降序）
+// 逾期风险榜（逾期天数降序；项目口径：计划完成时间 planEndDate，仅在建/未开工项目计入）
 export function overdueRank(tasks) {
   return tasks
     .map(t => {
-      const dl = t.deadline ? new Date(t.deadline) : null
+      const info = t.projectInfo || {}
+      const pe = info.planEndDate || ''
+      if (!pe || info.buildStatus === '完工' || CLOSED_BUILD_STATUS_SET.has(info.buildStatus)) return null
+      const d = new Date(String(pe).replace(/\//g, '-'))
+      if (isNaN(d)) return null
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      dl && dl.setHours(0, 0, 0, 0)
-      const days = dl ? Math.round((today - dl) / 86400000) : 0
+      d.setHours(0, 0, 0, 0)
+      const days = Math.round((today - d) / 86400000)
+      if (days <= 0) return null
       return { task: t, days }
     })
-    .filter(r => r.days > 0)
+    .filter(Boolean)
     .sort((a, b) => b.days - a.days)
 }
+const CLOSED_BUILD_STATUS_SET = new Set(['完工', '验收', '业务关闭', '财务关闭'])
 
-// 年度/月度筛选（支持 deadline 或 createdDate）
+// ===== 经营分析「轮盘」配置数据源：项目选择器 =====
+// 按年度/月度/项目经理筛出的全部状态项目（含已关闭），供用户勾选纳入统计范围
+export function selectableProjects(tasks, { year = 'all', month = 'all', pm = 'all' } = {}) {
+  return tasks
+    .filter(t => !isArchivedTask(t))
+    .filter(t => matchYearMonth(t, year, month))
+    .filter(t => pm === 'all' || String(t.projectInfo?.pmName || '').trim() === pm)
+    .map(t => ({
+      id: t.id,
+      name: t.projectInfo?.projectName || t.title || '—',
+      pm: t.projectInfo?.pmName || '',
+      buildStatus: t.projectInfo?.buildStatus || '',
+      createdDate: t.projectInfo?.createdDate || '',
+      contract: contractAmountOf(t)
+    }))
+    .sort((a, b) => b.contract - a.contract || a.name.localeCompare(b.name))
+}
+// 可选项目经理清单（全部状态项目）
+export function pmOptions(tasks) {
+  const set = new Set()
+  tasks.forEach(t => {
+    const pm = String(t.projectInfo?.pmName || '').trim()
+    if (pm) set.add(pm)
+  })
+  return [...set].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+}
+
+// 年度/月度筛选（全局口径：项目创建日期 projectInfo.createdDate，与 deadline 无关）
 export function matchYearMonth(t, year, month) {
-  const dateStr = t.deadline || (t.projectInfo && t.projectInfo.createdDate) || ''
-  // 未选择具体年度且未选择具体月份时，无日期项目（如 Excel 导入）也应显示
+  const dateStr = (t.projectInfo && t.projectInfo.createdDate) || ''
+  // 未选择具体年度且未选择具体月份时，无创建日期的项目也应显示
   if (year === 'all' && month === 'all') return true
   if (!dateStr) return false
   // 兼容 "2025-03-15" / "2025/3/15" / "2025-03" 等格式
@@ -466,9 +499,15 @@ function fmtWanStatic(v) {
   return (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })
 }
 
-// 紧迫度排序（逾期天数降序置顶 → 剩余天数升序）
+// 紧迫度排序（剩余天数升序；无日期排后）
 export function byUrgency(a, b) {
   const da = a.deadline ? new Date(a.deadline).getTime() : Infinity
   const db = b.deadline ? new Date(b.deadline).getTime() : Infinity
   return da - db
+}
+
+// ===== 年度选项（全局口径：项目创建日期）=====
+export function yearOptions(tasks) {
+  const ys = [...new Set(tasks.map(t => String(t.projectInfo?.createdDate || '').replace(/\//g, '-').slice(0, 4)).filter(y => /^\d{4}$/.test(y)))]
+  return ys.sort()
 }

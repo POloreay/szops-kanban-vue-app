@@ -112,7 +112,7 @@ import { useLogStore } from '../stores/logStore'
 import { useUserStore } from '../stores/userStore'
 import { PRIORITY_NAMES } from '../utils/constants'
 import { isArchivedTask, isClosedProject, isAnyArchived, isOverdue, isWarn, getDaysLeft, fmtDate } from '../utils/business'
-import { activeTasks, matchYearMonth, contractAmountOf, fmtWan } from '../utils/finance'
+import { activeTasks, matchYearMonth, contractAmountOf, fmtWan, yearOptions } from '../utils/finance'
 import TaskFormModal from '../components/kanban/TaskFormModal.vue'
 
 const props = defineProps({
@@ -209,10 +209,7 @@ const stageTasks = computed(() => {
 })
 const filtered = computed(() => stageTasks.value.filter(t => matchYearMonth(t, year.value, month.value)))
 
-const years = computed(() => {
-  const ys = [...new Set(stageTasks.value.map(t => (t.deadline || '').slice(0, 4)).filter(Boolean))]
-  return ys.sort()
-})
+const years = computed(() => yearOptions(taskStore.tasks))
 
 const kpis = computed(() => {
   const list = stageTasks.value

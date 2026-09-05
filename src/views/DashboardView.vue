@@ -209,7 +209,7 @@ import { isArchivedTask } from '../utils/business'
 import ProjectMultiSelect from '../components/kanban/ProjectMultiSelect.vue'
 import {
   activeTasks, totalContract, totalCollection, collectionTopN, barTopN,
-  ownerTopN, overdueRank, sumField, fmtWan, ratioCohort, contractRatio, matchYearMonth
+  ownerTopN, overdueRank, sumField, fmtWan, ratioCohort, contractRatio, matchYearMonth, yearOptions
 } from '../utils/finance'
 
 const taskStore = useTaskStore()
@@ -218,16 +218,10 @@ const openDrawer = inject('openTaskDrawer', () => {})
 const active = computed(() => activeTasks(taskStore.tasks))
 const archivedCount = computed(() => taskStore.tasks.filter(t => isArchivedTask(t)).length)
 
-// 年度/月度筛选
+// 年度/月度筛选（项目创建日期口径）
 const year = ref(String(new Date().getFullYear()))
 const month = ref('all')
-const years = computed(() => {
-  const ys = [...new Set(active.value.map(t => {
-    const d = t.deadline || (t.projectInfo && t.projectInfo.createdDate) || ''
-    return String(d).replace(/\//g, '-').slice(0, 4)
-  }).filter(Boolean))]
-  return ys.sort()
-})
+const years = computed(() => yearOptions(active.value))
 const filteredActive = computed(() => active.value.filter(t => matchYearMonth(t, year.value, month.value)))
 
 // ===== 项目维度筛选（实施环节项目多选）=====
@@ -245,17 +239,18 @@ const bidLost = computed(() => scopeActive.value.filter(t => t.subStatus === '�
 const totalContractYuan = computed(() => totalContract(scopeActive.value))
 const totalCollectionYuan = computed(() => totalCollection(scopeActive.value))
 
-// KPI
+// KPI（口径与项目总览/经营分析统一：回款率=累计收款/累计开票；逾期=计划完成时间超期且非终态）
 const kpis = computed(() => {
   const talk = scopeActive.value.filter(t => t.status === 'talk').length
   const proc = scopeActive.value.filter(t => t.status === 'proc').length
   const impl = scopeActive.value.filter(t => t.status === 'impl').length
   const overdue = overdueRank(scopeActive.value).length
-  const rate = totalContractYuan.value > 0 ? totalCollectionYuan.value / totalContractYuan.value : 0
+  const totalInvoice = sumField(scopeActive.value, 'accInvoice')
+  const rate = totalInvoice > 0 ? totalCollectionYuan.value / totalInvoice : 0
   return [
     { label: '在执行项目', value: scopeActive.value.length, sub: `前期 ${talk} · 采购 ${proc} · 实施 ${impl}` },
     { label: '合同总额（万元）', value: totalContractYuan.value ? fmtWan(totalContractYuan.value, 0) : '—', sub: '含税口径' },
-    { label: '累计回款率', value: totalContractYuan.value ? (rate * 100).toFixed(1) + '%' : '—', sub: totalContractYuan.value ? `回款 ${fmtWan(totalCollectionYuan.value, 0)} / 合同 ${fmtWan(totalContractYuan.value, 0)}` : '暂无合同数据' },
+    { label: '累计回款率', value: totalInvoice ? (rate * 100).toFixed(1) + '%' : '—', sub: totalInvoice ? `收款 ${fmtWan(totalCollectionYuan.value, 0)} / 开票 ${fmtWan(totalInvoice, 0)}` : '暂无开票数据' },
     { label: '逾期风险项目', value: overdue, sub: overdue ? `待决策 ${scopeActive.value.filter(t => t.needDecision).length} 个 · 最长逾期 ${Math.max(...overdueRank(scopeActive.value).map(r => r.days))} 天` : `待决策 ${scopeActive.value.filter(t => t.needDecision).length} 个` }
   ]
 })

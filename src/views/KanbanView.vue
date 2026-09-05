@@ -1,5 +1,52 @@
 <template>
   <div class="kanban-view">
+    <!-- 视图 Tab：项目总览 / 经营分析 -->
+    <div class="view-tabs">
+      <button class="view-tab" :class="{ active: viewTab === 'overview' }" type="button" @click="viewTab = 'overview'">项目总览</button>
+      <button class="view-tab" :class="{ active: viewTab === 'analysis' }" type="button" @click="viewTab = 'analysis'">经营分析</button>
+      <button v-if="riskCount" class="view-tab risk-tab" :class="{ active: viewTab === 'risk' }" type="button" @click="viewTab = 'risk'">
+        风险预警
+        <span class="risk-badge">{{ riskCount }}</span>
+      </button>
+    </div>
+
+    <!-- 风险预警中心 -->
+    <template v-if="viewTab === 'risk'">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">风险预警中心</h3>
+            <div class="panel-subtitle">六类规则实时扫描 · 点击行查看项目详情</div>
+          </div>
+          <div class="risk-summary">
+            <span v-for="(c, k) in riskByType" :key="k" class="risk-sum-pill" :class="RISK_TYPE_NAMES[k]">{{ k }} {{ c }}</span>
+          </div>
+        </div>
+        <table class="ds-table" v-if="risks.length">
+          <thead>
+            <tr><th style="width:90px">类型</th><th>项目</th><th>状态</th><th>项目经理</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in risks" :key="i" @click="openDrawer(r.task)">
+              <td><span class="g-pill" :class="RISK_PILL[r.type] || ''"><span class="dot" :style="{ background: RISK_DOT[r.type] || 'var(--muted)' }"></span>{{ r.type }}</span></td>
+              <td class="cell-title" :title="projName(r.task)">{{ projName(r.task) }}</td>
+              <td class="cell-text">{{ r.task.projectInfo?.buildStatus || '—' }}</td>
+              <td class="cell-text">{{ r.task.projectInfo?.pmName || '—' }}</td>
+              <td class="cell-text">{{ r.detail }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="stage-empty show">当前无风险预警</div>
+      </div>
+    </template>
+
+    <!-- 经营分析 -->
+    <template v-else-if="viewTab === 'analysis'">
+      <AnalysisPanel :tasks="analysisBase" :year="year" :month="month" @jump="onAnalysisJump" />
+    </template>
+
+    <!-- 项目总览 -->
+    <template v-else>
     <!-- 空数据引导 -->
     <div v-if="!active.length && !showClosed" class="panel empty-guide">
       <h3>暂无项目数据</h3>
@@ -98,6 +145,7 @@
         </div>
       </div>
     </template>
+    </template>
 
     <!-- 新建项目弹窗（模块内入口） -->
     <TaskFormModal v-model="showNewTask" />
@@ -114,10 +162,12 @@ import { STATUS_NAMES, LIST_COLUMNS, LIST_COLUMNS_DEFAULT, LIST_COLUMNS_STORAGE_
 import { isArchivedTask, isClosedProject, isOverdue } from '../utils/business'
 import {
   activeTasks, matchYearMonth, contractAmountOf, fmtWan,
-  collectionRateOf, revDoneRateOf, costExecRateOf, marginGapOf, metricsOf
+  collectionRateOf, revDoneRateOf, costExecRateOf, marginGapOf, metricsOf,
+  riskList, yearOptions
 } from '../utils/finance'
 import { fmtMoney } from '../utils/business'
 import TaskFormModal from '../components/kanban/TaskFormModal.vue'
+import AnalysisPanel from '../components/kanban/AnalysisPanel.vue'
 
 const taskStore = useTaskStore()
 const logStore = useLogStore()
@@ -151,6 +201,16 @@ async function delOne(t) {
 
 const year = ref('all')
 const month = ref('all')
+// 视图 Tab：项目总览 / 经营分析 / 风险预警
+const viewTab = ref('overview')
+const VIEW_TAB_KEY = 'szops_view_tab'
+try {
+  const savedTab = localStorage.getItem(VIEW_TAB_KEY)
+  if (['overview', 'analysis', 'risk'].includes(savedTab)) viewTab.value = savedTab
+} catch (e) { /* ignore */ }
+watch(viewTab, (v) => {
+  try { localStorage.setItem(VIEW_TAB_KEY, v) } catch (e) { /* ignore */ }
+})
 // 显示已关闭项目（业务/财务关闭/完工/验收）：默认隐藏
 const showClosed = ref(false)
 const CLOSED_SHOW_KEY = 'szops_show_closed'
@@ -158,10 +218,11 @@ const CLOSED_SHOW_KEY = 'szops_show_closed'
 // 列表数据源：开关控制是否包含已关闭项目
 const active = computed(() => activeTasks(taskStore.tasks, { includeClosed: showClosed.value }))
 
-const years = computed(() => {
-  const ys = [...new Set(active.value.map(t => (t.deadline || '').slice(0, 4)).filter(Boolean))]
-  return ys.sort()
-})
+// 经营分析基数：含已关闭项目（排除老归档），与总览开关无关
+const analysisBase = computed(() => taskStore.tasks.filter(t => !isArchivedTask(t)))
+
+// 年度列表：项目创建日期口径（createdDate）
+const years = computed(() => yearOptions(taskStore.tasks))
 
 const filtered = computed(() => active.value.filter(t => matchYearMonth(t, year.value, month.value)))
 
@@ -333,6 +394,32 @@ function rateStyle(t, c) {
 function cellClass(t, c) {
   return c.fmt === 'money' || c.fmt === 'num' || c.fmt === 'rate' ? 'num' : 'cell-text'
 }
+
+// ===== 风险预警中心 =====
+const RISK_TYPE_NAMES = {
+  '逾期风险': 'overdue', '长期停滞': 'stale', '停工预警': 'halted',
+  '垫资项目': 'advance', '注销标识': 'cancel', '成本超支': 'overrun'
+}
+const RISK_PILL = {
+  '逾期风险': 'bad', '长期停滞': 'warn', '停工预警': 'warn',
+  '垫资项目': 'warn', '注销标识': '', '成本超支': 'bad'
+}
+const RISK_DOT = {
+  '逾期风险': 'var(--bad)', '长期停滞': 'var(--warn)', '停工预警': 'var(--chart-orange)',
+  '垫资项目': 'var(--warn)', '注销标识': 'var(--muted)', '成本超支': 'var(--bad)'
+}
+const risks = computed(() => riskList(analysisBase.value))
+const riskCount = computed(() => risks.value.length)
+const riskByType = computed(() => {
+  const m = {}
+  risks.value.forEach(r => { m[r.type] = (m[r.type] || 0) + 1 })
+  return m
+})
+
+// 经营分析跳转总览：切回总览 Tab（维度筛选由 AnalysisPanel 内部状态承担）
+function onAnalysisJump() {
+  viewTab.value = 'overview'
+}
 </script>
 
 <style scoped lang="scss">
@@ -341,6 +428,70 @@ function cellClass(t, c) {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+// 视图 Tab
+.view-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.view-tab {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-standard);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &:hover { color: var(--fg); border-color: color-mix(in oklch, var(--fg) 24%, transparent); }
+  &.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-on);
+    font-weight: 500;
+  }
+}
+
+.risk-badge {
+  font-family: var(--font-mono);
+  background: var(--bad);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.risk-tab:not(.active) {
+  color: var(--bad);
+  border-color: color-mix(in oklch, var(--bad) 32%, transparent);
+
+  .risk-badge { background: color-mix(in oklch, var(--bad) 14%, transparent); color: var(--bad); }
+}
+
+.risk-summary {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.risk-sum-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  color: var(--muted);
+
+  &.overdue, &.overrun { color: var(--bad); border-color: color-mix(in oklch, var(--bad) 30%, transparent); }
+  &.stale, &.halted, &.advance { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 30%, transparent); }
 }
 
 .kpis {

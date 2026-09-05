@@ -18,7 +18,7 @@
         </button>
       </div>
       <div class="drawer-body">
-        <!-- 状态流程条 -->
+        <!-- 看板阶段流程条 -->
         <div class="drawer-section">
           <div class="status-flow">
             <template v-for="(s, i) in STATUS_ORDER" :key="s">
@@ -26,6 +26,22 @@
               <span v-if="i < STATUS_ORDER.length - 1" class="status-arrow">→</span>
             </template>
           </div>
+        </div>
+
+        <!-- 项目生命周期条（六段，按日期字段点亮） -->
+        <div class="drawer-section" v-if="lifecycleNodes.length">
+          <div class="drawer-section-title">项目生命周期</div>
+          <div class="lifecycle-bar" :class="{ overdue: lifecycleOverdue }">
+            <template v-for="(n, i) in lifecycleNodes" :key="n.label">
+              <div class="lc-node" :class="{ lit: n.lit, current: i === lifecycleCurrentIdx && !lifecycleOverdue, dim: !n.date }">
+                <div class="lc-dot"></div>
+                <div class="lc-label">{{ n.label }}</div>
+                <div class="lc-date mono">{{ n.date || '未填写' }}</div>
+              </div>
+              <div v-if="i < lifecycleNodes.length - 1" class="lc-line" :class="{ lit: n.lit && lifecycleNodes[i + 1]?.lit }"></div>
+            </template>
+          </div>
+          <div v-if="lifecycleOverdue" class="lc-warn">⚠ 计划完成时间已过，项目仍在建，请关注交付风险</div>
         </div>
 
         <!-- 基本信息 -->
@@ -202,6 +218,42 @@ const currentMilestoneIdx = computed(() => {
   const lastDone = ms.reduce((acc, m, i) => (m.done ? i : acc), -1)
   return Math.min(lastDone + 1, ms.length - 1)
 })
+
+// ===== 项目生命周期条（六段：创建→立项→计划开始→计划完成→业务关闭→财务关闭）=====
+const LC_DEFS = [
+  { key: 'createdDate', label: '创建' },
+  { key: 'approvalPassDate', label: '立项' },
+  { key: 'planStartDate', label: '计划开始' },
+  { key: 'planEndDate', label: '计划完成' },
+  { key: 'businessCloseDate', label: '业务关闭' },
+  { key: 'financeCloseDate', label: '财务关闭' }
+]
+const lifecycleNodes = computed(() => {
+  const info = props.task?.projectInfo || {}
+  return LC_DEFS.map(d => {
+    const date = String(info[d.key] || '').trim()
+    return { label: d.label, date: date ? date.slice(0, 10) : '', lit: !!date }
+  })
+})
+const lifecycleCurrentIdx = computed(() => {
+  const nodes = lifecycleNodes.value
+  let last = -1
+  nodes.forEach((n, i) => { if (n.lit) last = i })
+  return Math.min(last + 1, nodes.length - 1)
+})
+// 计划完成已过但仍在建 → 整条橙色预警
+const lifecycleOverdue = computed(() => {
+  const t = props.task
+  if (!t) return false
+  const info = t.projectInfo || {}
+  if (info.buildStatus !== '在建' || !info.planEndDate) return false
+  const d = new Date(String(info.planEndDate).replace(/\//g, '-'))
+  if (isNaN(d)) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  d.setHours(0, 0, 0, 0)
+  return d < today
+})
 </script>
 
 <style scoped lang="scss">
@@ -373,6 +425,90 @@ const currentMilestoneIdx = computed(() => {
 }
 
 .status-arrow { color: var(--border); font-size: 12px; }
+
+// ===== 生命周期条 =====
+.lifecycle-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: var(--space-2) 0 var(--space-1);
+}
+
+.lc-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 56px;
+  flex: 0 0 auto;
+
+  .lc-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: var(--radius-pill);
+    border: 2px solid var(--border);
+    background: var(--surface);
+    transition: all var(--motion-fast) var(--ease-standard);
+  }
+
+  .lc-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .lc-date { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+  &.lit .lc-dot {
+    border-color: var(--good);
+    background: color-mix(in oklch, var(--good) 18%, transparent);
+  }
+  &.lit .lc-label { color: var(--fg); font-weight: 500; }
+  &.dim { opacity: 0.55; }
+
+  &.current .lc-dot {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 16%, transparent);
+    animation: lcPulse 1.6s ease-in-out infinite;
+  }
+  &.current .lc-label { color: var(--accent); font-weight: 600; }
+
+  .lifecycle-bar.overdue & {
+    &.lit .lc-dot {
+      border-color: var(--warn);
+      background: color-mix(in oklch, var(--warn) 18%, transparent);
+    }
+    &.current .lc-dot {
+      border-color: var(--warn);
+      background: color-mix(in oklch, var(--warn) 18%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--warn) 18%, transparent);
+    }
+    &.current .lc-label { color: var(--warn); }
+  }
+}
+
+@keyframes lcPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.lc-line {
+  flex: 1 1 0;
+  height: 2px;
+  background: var(--border);
+  margin-top: 6px;
+  min-width: 12px;
+
+  &.lit { background: color-mix(in oklch, var(--good) 55%, transparent); }
+
+  .lifecycle-bar.overdue &.lit { background: color-mix(in oklch, var(--warn) 55%, transparent); }
+}
+
+.lc-warn {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  color: var(--warn);
+  background: color-mix(in oklch, var(--warn) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--warn) 26%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+}
 
 .milestone-list { display: flex; flex-direction: column; gap: var(--space-3); }
 
