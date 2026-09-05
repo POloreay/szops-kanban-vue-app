@@ -51,7 +51,7 @@ export const useBidStore = defineStore('bid', {
       })
     },
 
-    // 新建投标记录（字段延续项目管理表单口径）
+    // 新建投标记录（字段延续项目管理表单口径；amount=预计金额，单位元）
     addBid(data) {
       const stage = data.stage || 'lead'
       const bid = {
@@ -65,6 +65,7 @@ export const useBidStore = defineStore('bid', {
         stage,
         subStatus: data.subStatus || (BID_STAGES[stage]?.subs[0] || ''),
         agencyFee: data.agencyFee || '',
+        amount: data.amount === '' || data.amount == null ? '' : Number(data.amount),
         createdAt: new Date().toISOString()
       }
       this.bids.push(bid)

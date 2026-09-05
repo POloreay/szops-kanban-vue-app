@@ -33,11 +33,11 @@
         <div class="panel-header">
           <div>
             <h3 class="panel-title">付款 TOP{{ payRows.length }} 项目</h3>
-            <div class="panel-subtitle">累计付款 · 实际成本 · 付款率</div>
+            <div class="panel-subtitle">累计付款 · 实际成本 · 付款率 · 金额单位：万元</div>
           </div>
         </div>
         <table class="ds-table">
-          <thead><tr><th>项目名称</th><th>负责人</th><th>累计付款（万）</th><th>实际成本</th><th>付款率</th><th>状态</th></tr></thead>
+          <thead><tr><th>项目名称</th><th>负责人</th><th>累计付款（万）</th><th>实际成本（万元）</th><th>付款率</th><th>状态</th></tr></thead>
           <tbody>
             <tr v-for="r in payRows" :key="r.task.id" @click="openDrawer(r.task)">
               <td class="cell-title">{{ (r.task.projectInfo && r.task.projectInfo.projectName) || r.task.title || '—' }}</td>
@@ -60,7 +60,7 @@
 
       <div class="panels-row">
         <div class="panel">
-          <div class="panel-header"><h3 class="panel-title">付款 / 收票 / 开票 环形对比</h3></div>
+          <div class="panel-header"><h3 class="panel-title">付款 / 收票 / 开票 环形对比<span class="panel-title-unit">（万元）</span></h3></div>
           <div class="ring-grid">
             <div class="ring-card" v-for="r in rings" :key="r.label">
               <svg class="ring-svg" viewBox="0 0 100 100">
@@ -80,7 +80,7 @@
             <div class="due-item" v-for="d in dueSoon" :key="d.task.id">
               <div>
                 <div class="due-title">{{ (d.task.projectInfo && d.task.projectInfo.projectName) || d.task.title || '—' }}</div>
-                <div class="due-meta">到期 {{ d.task.deadline }}</div>
+                <div class="due-meta">计划完成 {{ (d.dueDate || '').slice(0, 10) }}</div>
               </div>
               <div class="due-right">
                 <div class="due-amount mono">{{ fmtWan(d.pending, 0) }} 万</div>
@@ -100,7 +100,6 @@ import { computed, ref, inject } from 'vue'
 import { useTaskStore } from '../stores/taskStore'
 import ProjectMultiSelect from '../components/kanban/ProjectMultiSelect.vue'
 import { activeTasks, paymentRows, sumField, sumPending, pendingOf, fmtWan, num, ratioCohort, contractRatio, matchYearMonth, yearOptions } from '../utils/finance'
-import { isOverdue, isWarn, getDaysLeft } from '../utils/business'
 
 const taskStore = useTaskStore()
 const openDrawer = inject('openTaskDrawer', () => {})
@@ -159,21 +158,35 @@ const rings = computed(() => {
   ]
 })
 
-// 即将到期付款：截止日期临近或已逾期，且仍有待付款的项目
+// 即将到期付款：计划完成时间临近或已逾期，且仍有待付款的项目（planEndDate 口径）
 const dueSoon = computed(() => {
   return scopeActive.value
-    .filter(t => t.deadline && pendingOf(t) > 0 && (isOverdue(t) || getDaysLeft(t.deadline) <= 30))
-    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
-    .slice(0, 5)
     .map(t => {
-      const d = getDaysLeft(t.deadline)
-      return {
-        task: t,
-        pending: pendingOf(t),
-        daysText: d < 0 ? `已逾期 ${Math.abs(d)} 天` : `剩余 ${d} 天`,
-        cls: d < 0 ? 'bad' : d <= 14 ? 'warn' : ''
-      }
+      const pe = t?.projectInfo?.planEndDate
+      if (!pe) return null
+      const d = new Date(String(pe).replace(/\//g, '-'))
+      if (isNaN(d)) return null
+      return { task: t, dueDate: String(pe), d }
     })
+    .filter(Boolean)
+    .filter(x => pendingOf(x.task) > 0)
+    .map(x => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      x.d.setHours(0, 0, 0, 0)
+      x.days = Math.round((x.d - today) / 86400000)
+      return x
+    })
+    .filter(x => x.days <= 30)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 5)
+    .map(x => ({
+      task: x.task,
+      dueDate: x.dueDate,
+      pending: pendingOf(x.task),
+      daysText: x.days < 0 ? `已逾期 ${Math.abs(x.days)} 天` : `剩余 ${x.days} 天`,
+      cls: x.days < 0 ? 'bad' : x.days <= 14 ? 'warn' : ''
+    }))
 })
 
 // 状态：超预算 > 超付 > 正常（付款率口径=付款/实际成本，超付即付款超过实际成本）

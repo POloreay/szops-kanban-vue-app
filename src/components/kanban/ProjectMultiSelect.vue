@@ -22,8 +22,14 @@
       <div class="pms-list">
         <label v-for="p in filteredProjects" :key="p.id" class="pms-item" :class="{ checked: isSelected(p.id) }">
           <input type="checkbox" :checked="isSelected(p.id)" @change="toggle(p.id)" />
-          <span class="pms-name" :title="p.title">{{ p.title }}</span>
-          <span class="pms-owner">{{ p.owner || '—' }}</span>
+          <div class="pms-info">
+            <span class="pms-name" :title="p.title">{{ p.title }}</span>
+            <span class="pms-meta">
+              <span class="pms-meta-item" v-if="p.planRevText">计划收入 {{ p.planRevText }} 万</span>
+              <span class="pms-meta-item" v-if="p.year">{{ p.year }} 年</span>
+              <span class="pms-meta-item" v-if="p.pm">项目经理 {{ p.pm }}</span>
+            </span>
+          </div>
         </label>
         <div v-if="!filteredProjects.length" class="pms-empty">未找到匹配项目</div>
       </div>
@@ -35,7 +41,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
-  projects: { type: Array, default: () => [] }, // {id, title, owner}
+  projects: { type: Array, default: () => [] }, // {id, title, planRevText, year, pm, owner}
   modelValue: { type: Array, default: () => [] } // 已选项目 id 数组
 })
 const emit = defineEmits(['update:modelValue'])
@@ -155,8 +161,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  width: 340px;
-  max-height: 380px;
+  width: 480px;
+  max-height: 440px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -218,9 +224,9 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 .pms-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
@@ -229,25 +235,33 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   &:hover { background: var(--bg); }
   &.checked { background: var(--accent-soft); }
 
-  input { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  input { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; margin-top: 2px; }
+
+  .pms-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
   .pms-name {
-    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--fg);
+    font-weight: 500;
+    font-size: 13px;
   }
 
-  .pms-owner {
+  .pms-meta {
+    display: flex;
+    gap: 10px;
     font-size: 11px;
     color: var(--muted);
-    flex-shrink: 0;
-    max-width: 60px;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .pms-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-variant-numeric: tabular-nums;
   }
 }
 

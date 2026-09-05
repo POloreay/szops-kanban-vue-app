@@ -1,15 +1,20 @@
 <template>
   <div class="bid-view">
-    <!-- 顶部工具条 -->
-    <div class="bid-toolbar">
-      <div class="bid-stats">
-        <span class="bid-stat">商机 <b>{{ countOf('lead') }}</b></span>
-        <span class="bid-stat">报名 <b>{{ countOf('signup') }}</b></span>
-        <span class="bid-stat">投标 <b>{{ countOf('prepare') }}</b></span>
-        <span class="bid-stat">开标 <b>{{ countOf('opening') }}</b></span>
-        <span class="bid-stat muted">归档 <b>{{ countOf('archive') }}</b></span>
-      </div>
-      <div class="bid-tools">
+    <!-- 二级标题 Tab：投标总览 + 五环节 -->
+    <div class="view-tabs">
+      <button class="view-tab" :class="{ active: tab === 'overview' }" type="button" @click="tab = 'overview'">投标总览</button>
+      <button
+        v-for="s in STAGE_TABS"
+        :key="s"
+        class="view-tab"
+        :class="{ active: tab === s }"
+        type="button"
+        @click="tab = s"
+      >
+        {{ BID_STAGES[s].name }}
+        <span class="tab-badge" v-if="stageCounts[s]">{{ stageCounts[s] }}</span>
+      </button>
+      <div class="tab-tools">
         <select class="stage-select" v-model="ownerFilter">
           <option value="">全部创建人</option>
           <option v-for="o in bidStore.owners" :key="o" :value="o">{{ o }}</option>
@@ -27,59 +32,124 @@
       <p>投标管理需要登录后使用，点击右上角「登录」。</p>
     </div>
 
-    <!-- 五列看板 -->
-    <div v-else class="bid-board">
-      <div class="bid-col" v-for="stage in BID_STAGE_ORDER" :key="stage">
-        <div class="bid-col-head">
-          <span class="bid-col-name">{{ BID_STAGES[stage].name }}</span>
-          <span class="bid-col-count">{{ lists[stage].length }}</span>
+    <!-- ==================== 投标总览 ==================== -->
+    <template v-else-if="tab === 'overview'">
+      <!-- 第一行：各环节数量 + 合计金额（不含归档） -->
+      <div class="ov-cards">
+        <div
+          v-for="s in ACTIVE_STAGES"
+          :key="s"
+          class="ov-card"
+          :class="s"
+          @click="tab = s"
+        >
+          <div class="ov-card-name">{{ BID_STAGES[s].name }}</div>
+          <div class="ov-card-count">{{ stageCounts[s] }}<span class="ov-unit">个</span></div>
+          <div class="ov-card-amount">{{ stageAmountText[s] }}</div>
         </div>
-        <div class="bid-col-body">
-          <div
-            v-for="b in lists[stage]"
-            :key="b.id"
-            class="bid-card"
-            :class="[pClass(b.priority), { 'is-archived': stage === 'archive', 'is-overdue': isOverdue(b) }]"
-            @click="openDetail(b)"
-          >
-            <div class="bid-card-title" :title="b.title">{{ b.title || '未命名商机' }}</div>
-            <div class="bid-card-sub" v-if="b.subStatus">{{ b.subStatus }}</div>
-            <div class="bid-card-meta">
-              <span class="g-pill" :class="priorityPill(b.priority)">{{ PRIORITY_NAMES[b.priority] || '中' }}</span>
-              <span class="bid-card-owner" v-if="b.owner">{{ b.owner }}</span>
-              <span class="bid-card-dl" :class="deadlineClass(b)">{{ deadlineText(b) }}</span>
-            </div>
-            <!-- 操作区 -->
-            <div class="bid-card-ops" @click.stop>
-              <!-- 流转：进入下一环节 -->
-              <select
-                v-if="BID_NEXT[stage]"
-                class="bid-op-select"
-                :value="''"
-                @change="onMove(b, $event)"
-              >
-                <option value="" disabled>流转到 →</option>
-                <option :value="BID_NEXT[stage]">进入「{{ BID_STAGES[BID_NEXT[stage]].name }}」</option>
-                <option value="__giveup">放弃投标（归档）</option>
-              </select>
-              <!-- opening：开标结果 -->
-              <template v-else-if="stage === 'opening'">
-                <button class="bid-op-btn good" @click="onResult(b, '中标归档')">中标</button>
-                <button class="bid-op-btn bad" @click="onResult(b, '落标归档')">落标</button>
-                <button class="bid-op-btn" @click="onResult(b, '放弃归档')">放弃</button>
-              </template>
-              <!-- archive：恢复或删除 -->
-              <template v-else>
-                <button class="bid-op-btn" @click="onRestore(b)">恢复</button>
-                <button v-if="canManage(b)" class="bid-op-btn bad" @click="onDelete(b)">删除</button>
-              </template>
-              <button v-if="canManage(b) && stage !== 'archive'" class="bid-op-btn" @click="openEdit(b)">编辑</button>
-            </div>
-          </div>
-          <div v-if="!lists[stage].length" class="bid-col-empty">暂无项目</div>
+        <div class="ov-card ov-total">
+          <div class="ov-card-name">在途合计（不含归档）</div>
+          <div class="ov-card-count">{{ activeTotalCount }}<span class="ov-unit">个</span></div>
+          <div class="ov-card-amount">{{ activeTotalAmountText }}</div>
         </div>
       </div>
-    </div>
+
+      <!-- 第二行：处置时限紧迫度 TOP5（各环节前5，不含归档） -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">处置时限紧迫榜 · TOP5</h3>
+            <div class="panel-subtitle">各环节按截止日期临近程度排序（已逾期置顶） · 不含归档 · 点击行查看详情</div>
+          </div>
+        </div>
+        <table class="ds-table" v-if="urgentList.length">
+          <thead>
+            <tr><th style="width:110px">环节</th><th>项目/商机名称</th><th>子状态</th><th>创建人</th><th>预计金额(万元)</th><th>截止日期</th><th style="width:120px">处置时限</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in urgentList" :key="r.b.id" @click="openDetail(r.b)">
+              <td><span class="g-pill stage-pill" :class="r.stageKey"><span class="dot"></span>{{ BID_STAGES[r.b.stage || 'lead'].name }}</span></td>
+              <td class="cell-title" :title="r.b.title">{{ r.b.title || '未命名商机' }}</td>
+              <td class="cell-text">{{ r.b.subStatus || '—' }}</td>
+              <td class="cell-text">{{ r.b.owner || '—' }}</td>
+              <td class="num">{{ r.amountText }}</td>
+              <td class="cell-text mono">{{ r.b.deadline || '—' }}</td>
+              <td><span class="g-pill" :class="r.cls"><span class="dot"></span>{{ r.daysText }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="stage-empty show">当前无在途投标（不含归档）</div>
+      </div>
+    </template>
+
+    <!-- ==================== 各环节页 ==================== -->
+    <template v-else>
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">{{ BID_STAGES[tab].name }} · {{ lists[tab].length }} 条</h3>
+            <div class="panel-subtitle">{{ stageSubtitle(tab) }}</div>
+          </div>
+          <div class="stage-tools">
+            <span class="stage-count">合计 {{ fmtWan(stageAmount(tab)) }} 万元</span>
+          </div>
+        </div>
+        <div class="stage-table-wrap">
+          <table class="ds-table">
+            <thead>
+              <tr>
+                <th style="width:50px">序号</th>
+                <th>项目/商机名称</th>
+                <th>子状态</th>
+                <th>创建人</th>
+                <th>预计金额(万元)</th>
+                <th v-if="tab === 'archive'">归档结果</th>
+                <th>截止日期</th>
+                <th style="width:120px">处置时限</th>
+                <th style="width:200px">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(b, i) in lists[tab]" :key="b.id" @click="openDetail(b)" :class="{ 'row-archived': tab === 'archive' }">
+                <td class="num row-idx">{{ String(i + 1).padStart(2, '0') }}</td>
+                <td class="cell-title" :title="b.title">{{ b.title || '未命名商机' }}</td>
+                <td class="cell-text">{{ b.subStatus || '—' }}</td>
+                <td class="cell-text">{{ b.owner || '—' }}</td>
+                <td class="num">{{ amountText(b) }}</td>
+                <td v-if="tab === 'archive'" class="cell-text">
+                  <span class="g-pill" :class="archivePill(b.subStatus)"><span class="dot"></span>{{ b.subStatus || '—' }}</span>
+                </td>
+                <td class="cell-text mono">{{ b.deadline || '—' }}</td>
+                <td><span class="g-pill" :class="deadlinePillClass(b)"><span class="dot"></span>{{ deadlineText(b) }}</span></td>
+                <td>
+                  <div class="row-ops" @click.stop>
+                    <!-- 流转：进入下一环节 -->
+                    <select v-if="BID_NEXT[tab]" class="bid-op-select" :value="''" @change="onMove(b, $event)">
+                      <option value="" disabled>流转到 →</option>
+                      <option :value="BID_NEXT[tab]">进入「{{ BID_STAGES[BID_NEXT[tab]].name }}」</option>
+                      <option value="__giveup">放弃投标（归档）</option>
+                    </select>
+                    <!-- opening：开标结果 -->
+                    <template v-else-if="tab === 'opening'">
+                      <button class="bid-op-btn good" @click="onResult(b, '中标归档')">中标</button>
+                      <button class="bid-op-btn bad" @click="onResult(b, '落标归档')">落标</button>
+                      <button class="bid-op-btn" @click="onResult(b, '放弃归档')">放弃</button>
+                    </template>
+                    <!-- archive：恢复或删除 -->
+                    <template v-else>
+                      <button class="bid-op-btn" @click="onRestore(b)">恢复</button>
+                      <button v-if="canManage(b)" class="bid-op-btn bad" @click="onDelete(b)">删除</button>
+                    </template>
+                    <button v-if="canManage(b) && tab !== 'archive'" class="bid-op-btn" @click="openEdit(b)">编辑</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!lists[tab].length" class="stage-empty show">本环节暂无项目</div>
+        </div>
+      </div>
+    </template>
 
     <!-- 新建/编辑弹窗 -->
     <BidFormModal v-model="showForm" :editing="editingBid" />
@@ -103,6 +173,7 @@
               <div class="detail-item"><span class="detail-label">联系人</span><span>{{ detailBid.contact || '—' }}</span></div>
               <div class="detail-item"><span class="detail-label">优先级</span><span>{{ PRIORITY_NAMES[detailBid.priority] || '中' }}</span></div>
               <div class="detail-item"><span class="detail-label">截止日期</span><span class="mono">{{ detailBid.deadline || '—' }}</span></div>
+              <div class="detail-item" v-if="detailBid.amount !== '' && detailBid.amount != null && detailBid.amount > 0"><span class="detail-label">预计金额</span><span class="mono">{{ fmtWan(detailBid.amount) }} 万元</span></div>
               <div class="detail-item" v-if="detailBid.agencyFee"><span class="detail-label">代理服务费(元)</span><span class="mono">{{ fmtMoney(detailBid.agencyFee) }}</span></div>
               <div class="detail-item"><span class="detail-label">创建时间</span><span class="mono">{{ fmtDateTime(detailBid.createdAt) }}</span></div>
             </div>
@@ -118,13 +189,14 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useBidStore } from '../stores/bidStore'
 import { useLogStore } from '../stores/logStore'
 import { useUserStore } from '../stores/userStore'
 import { BID_STAGES, BID_STAGE_ORDER, BID_STAGE_NAMES, BID_NEXT, PRIORITY_NAMES } from '../utils/constants'
-import { isOverdue, getDaysLeft, fmtMoney } from '../utils/business'
+import { fmtWan } from '../utils/finance'
+import { getDaysLeft, fmtMoney } from '../utils/business'
 import BidFormModal from '../components/kanban/BidFormModal.vue'
 
 const bidStore = useBidStore()
@@ -135,6 +207,19 @@ onMounted(() => bidStore.loadBids())
 
 const ownerFilter = ref('')
 
+// Tab：overview + 五环节（含归档，归档仅在 Tab 内显示）
+const STAGE_TABS = BID_STAGE_ORDER
+const ACTIVE_STAGES = ['lead', 'signup', 'prepare', 'opening']
+const BID_TAB_KEY = 'szops_bid_tab'
+const tab = ref('overview')
+try {
+  const saved = localStorage.getItem(BID_TAB_KEY)
+  if (saved && (saved === 'overview' || BID_STAGE_ORDER.includes(saved))) tab.value = saved
+} catch (e) { /* ignore */ }
+watch(tab, v => {
+  try { localStorage.setItem(BID_TAB_KEY, v) } catch (e) { /* ignore */ }
+})
+
 const lists = computed(() => {
   const r = {}
   BID_STAGE_ORDER.forEach(s => {
@@ -143,8 +228,70 @@ const lists = computed(() => {
   return r
 })
 
-function countOf(stage) {
-  return bidStore.bids.filter(b => (b.stage || 'lead') === stage).length
+// 各环节数量（不受创建人筛选影响，反映全量）
+const stageCounts = computed(() => {
+  const r = {}
+  BID_STAGE_ORDER.forEach(s => {
+    r[s] = bidStore.bids.filter(b => (b.stage || 'lead') === s).length
+  })
+  return r
+})
+
+// 各环节金额（万元，受创建人筛选影响，不含归档）
+const stageAmount = (s) => (lists.value[s] || []).reduce((a, b) => a + (Number(b.amount) > 0 ? Number(b.amount) : 0), 0)
+const stageAmountText = computed(() => {
+  const r = {}
+  ACTIVE_STAGES.forEach(s => {
+    const v = stageAmount(s)
+    r[s] = v > 0 ? fmtWan(v, 1) + ' 万元' : '暂无金额'
+  })
+  return r
+})
+const activeTotalCount = computed(() => ACTIVE_STAGES.reduce((a, s) => a + (lists.value[s]?.length || 0), 0))
+const activeTotalAmount = computed(() => ACTIVE_STAGES.reduce((a, s) => a + stageAmount(s), 0))
+const activeTotalAmountText = computed(() => {
+  const v = activeTotalAmount.value
+  return v > 0 ? fmtWan(v, 1) + ' 万元' : '暂无金额'
+})
+
+// 处置时限紧迫榜：四个在途环节各取 TOP5 按剩余天数升序（逾期在前），再整表按紧迫度排序截取前5
+const urgentList = computed(() => {
+  const rows = []
+  ACTIVE_STAGES.forEach(s => {
+    (lists.value[s] || []).forEach(b => {
+      if (!b.deadline) return
+      const d = getDaysLeft(b.deadline)
+      rows.push({ b, stageKey: s, days: d })
+    })
+  })
+  rows.sort((a, x) => a.days - x.days)
+  return rows.slice(0, 5).map(r => {
+    const d = r.days
+    return {
+      b: r.b,
+      stageKey: r.stageKey,
+      amountText: amountText(r.b),
+      daysText: d < 0 ? `已逾期 ${Math.abs(d)} 天` : `剩 ${d} 天`,
+      cls: d < 0 ? 'bad' : d <= 3 ? 'bad' : d <= 7 ? 'warn' : ''
+    }
+  })
+})
+
+function amountText(b) {
+  const v = Number(b.amount)
+  return v > 0 ? fmtWan(v, 1) : '—'
+}
+
+function stageSubtitle(s) {
+  const subs = BID_STAGES[s].subs
+  if (s === 'archive') return `归档结果：${subs.join(' / ')} · 可恢复或删除`
+  return `子状态：${subs.join(' / ')}`
+}
+
+function archivePill(sub) {
+  if (sub === '中标归档') return 'good'
+  if (sub === '落标归档') return 'bad'
+  return 'warn'
 }
 
 // 权限：创建人本人或管理员
@@ -226,12 +373,12 @@ async function onDelete(b) {
 }
 
 // 样式工具
-function pClass(p) { return { high: 'p-high', medium: 'p-mid', low: 'p-low' }[p] || 'p-mid' }
-function priorityPill(p) { return { high: 'bad', medium: 'warn', low: 'good' }[p] || 'warn' }
-function deadlineClass(b) {
-  if (!b.deadline) return 'normal'
-  if (isOverdue(b)) return 'overdue'
-  return getDaysLeft(b.deadline) <= 7 ? 'soon' : 'normal'
+function deadlinePillClass(b) {
+  if (!b.deadline) return ''
+  const d = getDaysLeft(b.deadline)
+  if (d < 0) return 'bad'
+  if (d <= 7) return 'warn'
+  return 'good'
 }
 function deadlineText(b) {
   if (!b.deadline) return '未设截止'
@@ -255,33 +402,164 @@ function fmtDateTime(s) {
   min-height: 100%;
 }
 
-.bid-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.bid-stats {
-  display: flex;
-  gap: var(--space-3);
-  font-size: 13px;
-  color: var(--muted);
-
-  .bid-stat b {
-    color: var(--fg);
-    font-family: var(--font-mono);
-    font-size: 15px;
-    margin: 0 2px;
-  }
-  .bid-stat.muted b { color: var(--muted); }
-}
-
-.bid-tools {
+// 二级标题 Tab（与 KanbanView view-tabs 同款）
+.view-tabs {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.view-tab {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-standard);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &:hover { color: var(--fg); border-color: color-mix(in oklch, var(--fg) 24%, transparent); }
+  &.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-on);
+    font-weight: 500;
+
+    .tab-badge { background: color-mix(in oklab, #fff 26%, transparent); color: var(--accent-on); }
+  }
+}
+.tab-badge {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 16px;
+}
+.tab-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// 总览第一行：环节卡片
+.ov-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-3);
+}
+@media (max-width: 1200px) {
+  .ov-cards { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 760px) {
+  .ov-cards { grid-template-columns: repeat(2, 1fr); }
+}
+.ov-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-standard);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--stage-color, var(--accent));
+  }
+  &.lead    { --stage-color: var(--biz-blue); }
+  &.signup  { --stage-color: var(--chart-gold); }
+  &.prepare { --stage-color: var(--biz-teal); }
+  &.opening { --stage-color: var(--chart-orange); }
+  &.ov-total { --stage-color: var(--accent); cursor: default; }
+
+  &:hover {
+    border-color: color-mix(in oklch, var(--stage-color, var(--accent)) 45%, transparent);
+    transform: translateY(-1px);
+  }
+}
+.ov-card-name {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.ov-card-count {
+  font-size: 26px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--fg);
+  line-height: 1.1;
+
+  .ov-unit {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+}
+.ov-card-amount {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+// 环节 pill 配色
+.stage-pill {
+  &.lead    .dot { background: var(--biz-blue); }
+  &.signup  .dot { background: var(--chart-gold); }
+  &.prepare .dot { background: var(--biz-teal); }
+  &.opening .dot { background: var(--chart-orange); }
+}
+
+// 表格行操作
+.row-ops {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.row-archived td { opacity: 0.72; }
+.row-idx { color: var(--muted); }
+
+.bid-op-select {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+.bid-op-btn {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--motion-fast) var(--ease-standard);
+
+  &:hover { border-color: var(--accent); color: var(--accent); }
+  &.good:hover { border-color: var(--good); color: var(--good); }
+  &.bad:hover { border-color: var(--bad); color: var(--bad); }
 }
 
 // 主色按钮（与项目看板删除按钮同款）
@@ -303,155 +581,6 @@ function fmtDateTime(s) {
 
   svg { flex-shrink: 0; }
   &:hover { background: var(--primary-hover); }
-}
-
-// 五列看板
-.bid-board {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-}
-
-@media (max-width: 1400px) {
-  .bid-board { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 1000px) {
-  .bid-board { grid-template-columns: repeat(2, 1fr); }
-}
-
-.bid-col {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-height: 200px;
-}
-
-.bid-col-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 4px;
-
-  .bid-col-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--fg);
-  }
-  .bid-col-count {
-    font-size: 12px;
-    font-family: var(--font-mono);
-    color: var(--muted);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    padding: 0 8px;
-  }
-}
-
-.bid-col-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-height: calc(100vh - 300px);
-  overflow-y: auto;
-}
-
-.bid-col-empty {
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted);
-  padding: var(--space-5) 0;
-}
-
-.bid-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
-
-  &:hover {
-    border-color: color-mix(in oklch, var(--accent) 40%, transparent);
-    box-shadow: var(--elev-raised);
-  }
-
-  &.is-archived { opacity: 0.72; }
-  &.is-overdue { border-color: color-mix(in oklch, var(--bad) 30%, transparent); }
-}
-
-.bid-card-title {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.bid-card-sub {
-  font-size: 11px;
-  color: var(--accent);
-  margin-top: 2px;
-}
-
-.bid-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  flex-wrap: wrap;
-  font-size: 11px;
-  color: var(--muted);
-
-  .bid-card-dl {
-    &.overdue { color: var(--bad); }
-    &.soon { color: var(--warn); }
-    &.normal { color: var(--muted); }
-  }
-}
-
-.bid-card-ops {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.bid-op-select {
-  font: inherit;
-  font-size: 11px;
-  padding: 2px 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--fg);
-  cursor: pointer;
-}
-
-.bid-op-btn {
-  font: inherit;
-  font-size: 11px;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--fg);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--motion-fast) var(--ease-standard);
-
-  &:hover { border-color: var(--accent); color: var(--accent); }
-  &.good:hover { border-color: var(--good); color: var(--good); }
-  &.bad:hover { border-color: var(--bad); color: var(--bad); }
 }
 
 // 弹窗（与全局弹窗同款）

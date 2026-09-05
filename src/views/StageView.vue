@@ -65,7 +65,8 @@
               v-for="(t, i) in filtered"
               :key="t.id"
               class="proj-card"
-              :class="[pClass(t.priority), { 'is-overdue': isOverdue(t), 'is-selected': selectMode && selectedIds.has(t.id), 'is-disabled': selectMode && !canManage(t) }]"
+              :class="[pClass(t.priority), { 'is-overdue': deadlineClass(t) === 'overdue', 'is-selected': selectMode && selectedIds.has(t.id), 'is-disabled': selectMode && !canManage(t) }]"
+              :title="cardTitle(t)"
               @click="selectMode ? toggleSelect(t) : openDrawer(t)"
             >
               <div v-if="selectMode" class="proj-card-check" @click.stop="toggleSelect(t)">
@@ -87,7 +88,7 @@
               <div class="proj-card-owner">
                 <span class="avatar">{{ (t.owner || '?').slice(0, 1) }}</span>{{ t.owner || '—' }}
               </div>
-              <div class="proj-card-deadline" :class="deadlineClass(t)">
+              <div class="proj-card-deadline" :class="deadlineClass(t)" :title="planEndFull(t)">
                 <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
                 {{ deadlineText(t) }}
               </div>
@@ -111,7 +112,7 @@ import { useTaskStore } from '../stores/taskStore'
 import { useLogStore } from '../stores/logStore'
 import { useUserStore } from '../stores/userStore'
 import { PRIORITY_NAMES } from '../utils/constants'
-import { isArchivedTask, isClosedProject, isAnyArchived, isOverdue, isWarn, getDaysLeft, fmtDate } from '../utils/business'
+import { isArchivedTask, isClosedProject, isAnyArchived, fmtDate } from '../utils/business'
 import { activeTasks, matchYearMonth, contractAmountOf, fmtWan, yearOptions } from '../utils/finance'
 import TaskFormModal from '../components/kanban/TaskFormModal.vue'
 
@@ -244,18 +245,38 @@ function amountText(t) {
 function pClass(p) { return { high: 'p-high', medium: 'p-mid', low: 'p-low' }[p] || 'p-mid' }
 function priorityPill(p) { return { high: 'bad', medium: 'warn', low: 'good' }[p] || 'warn' }
 
+function planEndOf(t) {
+  const pe = t?.projectInfo?.planEndDate
+  if (!pe) return null
+  const d = new Date(String(pe).replace(/\//g, '-'))
+  return isNaN(d) ? null : d
+}
+function planEndFull(t) {
+  const pe = t?.projectInfo?.planEndDate
+  return pe ? `计划完成：${String(pe).slice(0, 10)}` : '未设置计划完成时间'
+}
+function cardTitle(t) {
+  return `${projName(t)} · ${planEndFull(t)}`
+}
+
 function deadlineClass(t) {
-  if (!t.deadline) return 'normal'
-  if (isOverdue(t)) return 'overdue'
-  const d = getDaysLeft(t.deadline)
-  return d <= 60 ? 'soon' : 'normal'
+  const d = planEndOf(t)
+  if (!d) return 'normal'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (d < today) return 'overdue'
+  const days = Math.round((d - today) / 86400000)
+  return days <= 60 ? 'soon' : 'normal'
 }
 
 function deadlineText(t) {
-  if (!t.deadline) return '未设置'
-  const d = getDaysLeft(t.deadline)
-  if (d < 0) return `已逾期 ${Math.abs(d)} 天`
-  return `剩余 ${d} 天`
+  const d = planEndOf(t)
+  if (!d) return '未设置'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.round((d - today) / 86400000)
+  if (days < 0) return `已逾期 ${Math.abs(days)} 天`
+  return `剩余 ${days} 天`
 }
 </script>
 

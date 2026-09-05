@@ -25,18 +25,53 @@
     </div>
   </header>
 
-  <el-dialog v-model="showLogin" title="登录" width="360px" :close-on-click-modal="false">
-    <el-form @submit.prevent="handleLogin">
-      <el-form-item label="用户名">
-        <el-input v-model="loginForm.username" placeholder="请输入用户名" />
-      </el-form-item>
-      <el-form-item label="密码">
-        <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" show-password />
-      </el-form-item>
-    </el-form>
+  <el-dialog v-model="showLogin" width="420px" :close-on-click-modal="false" class="login-dialog" :show-close="true" append-to-body>
+    <div class="login-banner">
+      <div class="banner-ribbon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m3 17 6-6 4 4 8-8" />
+          <path d="M14 7h7v7" />
+        </svg>
+      </div>
+      <div class="banner-brand">数智运营看板</div>
+      <div class="banner-hello">无敌牛马，欢迎回来！</div>
+      <div class="banner-sub">鞍已备好，粮草已足，请开始今日搬砖</div>
+    </div>
+    <div class="login-body">
+      <el-form @submit.prevent="handleLogin" label-position="top" class="login-form">
+        <el-form-item label="用户名">
+          <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large">
+            <template #prefix>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="密码">
+          <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" show-password size="large" @keyup.enter="handleLogin">
+            <template #prefix>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </template>
+          </el-input>
+        </el-form-item>
+      </el-form>
+    </div>
     <template #footer>
-      <el-button @click="showLogin = false">取消</el-button>
-      <el-button type="primary" @click="handleLogin">登录</el-button>
+      <div class="login-footer">
+        <button class="btn btn-secondary login-cancel" type="button" @click="showLogin = false">取消</button>
+        <button class="btn btn-primary login-submit" type="submit" @click="handleLogin">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2Z" />
+          </svg>
+          开工
+        </button>
+      </div>
+      <div class="login-tip">今日宜搬砖 · 忌摸鱼</div>
     </template>
   </el-dialog>
 </template>
@@ -87,7 +122,7 @@ function handleLogin() {
   if (ok) {
     showLogin.value = false
     loginForm.value = { username: '', password: '' }
-    ElMessage.success('欢迎回来，' + userStore.currentUser.username)
+    ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
     logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
     userStore.resumePending()
   } else {
@@ -227,5 +262,119 @@ async function handleSync() {
 
 .spin-anim {
   animation: spin 1s linear infinite;
+}
+
+// ===== 登录弹窗：牛马晨会卡 =====
+:global(.login-dialog) {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+
+  .el-dialog__header {
+    padding: 0;
+  }
+
+  .el-dialog__body {
+    padding: 0;
+  }
+
+  .el-dialog__footer {
+    padding: 0;
+  }
+}
+
+.login-banner {
+  position: relative;
+  padding: 30px 24px 24px;
+  background: linear-gradient(135deg, #1d59d9 0%, #2f6feb 55%, #5b8ef0 100%);
+  color: #fff;
+  text-align: center;
+
+  .banner-ribbon {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: color-mix(in oklch, #ffffff 18%, transparent);
+    border: 1px solid color-mix(in oklch, #ffffff 32%, transparent);
+    backdrop-filter: blur(4px);
+
+    svg {
+      width: 24px;
+      height: 24px;
+      color: #fff;
+    }
+  }
+
+  .banner-brand {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+  }
+
+  .banner-hello {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 8px color-mix(in oklch, #000 24%, transparent);
+  }
+
+  .banner-sub {
+    margin-top: 6px;
+    font-size: 12px;
+    opacity: 0.82;
+    letter-spacing: 1px;
+  }
+}
+
+.login-body {
+  padding: 22px 24px 4px;
+
+  :deep(.el-form-item__label) {
+    font-size: 12px;
+    color: var(--muted);
+  }
+}
+
+.login-footer {
+  display: flex;
+  gap: 10px;
+  padding: 4px 24px 6px;
+
+  .login-submit {
+    flex: 1;
+    font-size: 15px;
+    letter-spacing: 8px;
+    padding-left: 20px;
+
+    svg {
+      margin-right: -4px;
+    }
+  }
+}
+
+.login-tip {
+  padding: 0 24px 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 2px;
+}
+
+// 弹窗关闭按钮移入蓝色横幅区域
+:global(.login-dialog) {
+  .el-dialog__headerbtn {
+    top: 10px;
+    right: 12px;
+    z-index: 3;
+
+    .el-dialog__close {
+      color: #fff;
+    }
+  }
 }
 </style>

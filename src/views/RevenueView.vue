@@ -34,11 +34,11 @@
           <div class="panel-header">
             <div>
               <h3 class="panel-title">回款明细 · 按项目</h3>
-              <div class="panel-subtitle">点击行查看项目详情</div>
+              <div class="panel-subtitle">点击行查看项目详情 · 金额单位：万元</div>
             </div>
           </div>
           <table class="ds-table">
-            <thead><tr><th>项目名称</th><th>合同额（万）</th><th>累计回款</th><th>回款率</th><th>状态</th></tr></thead>
+            <thead><tr><th>项目名称</th><th>合同额（万）</th><th>累计回款（万元）</th><th>回款率</th><th>状态</th></tr></thead>
             <tbody>
               <tr v-for="r in rows" :key="r.task.id" @click="openDrawer(r.task)">
                 <td class="cell-title">{{ (r.task.projectInfo && r.task.projectInfo.projectName) || r.task.title || '—' }}</td>
@@ -57,7 +57,7 @@
         </div>
 
         <div class="panel">
-          <div class="panel-header"><h3 class="panel-title">回款趋势 · 近 6 月</h3></div>
+          <div class="panel-header"><h3 class="panel-title">回款趋势 · 近 6 月<span class="panel-title-unit">（万元）</span></h3></div>
           <div class="chart" style="height:220px;" v-if="trend.length">
             <svg viewBox="0 0 400 200" preserveAspectRatio="none">
               <defs>

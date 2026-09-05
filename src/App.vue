@@ -9,6 +9,7 @@
     </div>
     <TaskFormModal v-model="showNewTask" :editing="editingTask" />
     <TaskDrawer :task="drawerTask" @close="drawerTask = null" />
+    <TodoNotice />
   </div>
 </template>
 
@@ -19,6 +20,7 @@ import AppSidebar from './components/layout/AppSidebar.vue'
 import AppHeader from './components/layout/AppHeader.vue'
 import TaskFormModal from './components/kanban/TaskFormModal.vue'
 import TaskDrawer from './components/kanban/TaskDrawer.vue'
+import TodoNotice from './components/layout/TodoNotice.vue'
 import { useTaskStore } from './stores/taskStore'
 import { useBidStore } from './stores/bidStore'
 import { useUserStore } from './stores/userStore'

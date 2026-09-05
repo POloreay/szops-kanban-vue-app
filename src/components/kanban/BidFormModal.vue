@@ -5,7 +5,7 @@
         <div class="modal-header">
           <div>
             <h2 class="modal-title">{{ props.editing ? '编辑投标' : '新建投标' }}</h2>
-            <div class="modal-subtitle">字段延续项目管理口径：名称 / 描述 / 创建人 / 联系人 / 截止日期 / 优先级 / 环节</div>
+            <div class="modal-subtitle">字段延续项目管理口径：名称 / 描述 / 创建人 / 联系人 / 截止日期 / 优先级 / 环节 / 预计金额</div>
           </div>
           <button class="btn-icon" @click="onCancel" aria-label="关闭">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -50,6 +50,7 @@
             </div>
             <div class="form-grid-2">
               <div class="form-row"><label>项目代理服务费(元)</label><input class="form-input" v-model="form.agencyFee" type="number" min="0" step="0.01" placeholder="选填" /></div>
+              <div class="form-row"><label>预计金额(万元)</label><input class="form-input" v-model="form.amountWan" type="number" min="0" step="0.1" placeholder="选填，如 120.5" /></div>
             </div>
           </div>
           <div class="modal-footer">
@@ -81,7 +82,7 @@ const visible = ref(false)
 
 const form = reactive({
   title: '', desc: '', owner: '', contact: '', deadline: '',
-  priority: '中', stage: 'lead', subStatus: '', agencyFee: ''
+  priority: '中', stage: 'lead', subStatus: '', agencyFee: '', amountWan: ''
 })
 
 const curSubs = computed(() => BID_STAGES[form.stage]?.subs || [])
@@ -103,8 +104,14 @@ function fillForm(b) {
     priority: b?.priority || '中',
     stage: b?.stage || 'lead',
     subStatus: b?.subStatus || '',
-    agencyFee: b?.agencyFee === '' || b?.agencyFee == null ? '' : b.agencyFee
+    agencyFee: b?.agencyFee === '' || b?.agencyFee == null ? '' : b.agencyFee,
+    amountWan: b?.amount ? b.amount / 10000 : ''
   })
+}
+
+// 万元输入 → 元存储
+function amountYuan() {
+  return form.amountWan === '' || form.amountWan == null ? '' : Math.round(Number(form.amountWan) * 10000)
 }
 
 function onSubmit() {
@@ -123,7 +130,8 @@ function onSubmit() {
       priority: priorityKey,
       stage: form.stage,
       subStatus: form.subStatus,
-      agencyFee: form.agencyFee === '' ? '' : Number(form.agencyFee)
+      agencyFee: form.agencyFee === '' ? '' : Number(form.agencyFee),
+      amount: amountYuan()
     })
     logStore.addLog('编辑', `修改投标「${form.title}」`, userStore.currentUser?.username || '系统')
     ElMessage.success('投标修改已保存')
@@ -137,7 +145,8 @@ function onSubmit() {
       priority: priorityKey,
       stage: form.stage,
       subStatus: form.subStatus,
-      agencyFee: form.agencyFee === '' ? '' : Number(form.agencyFee)
+      agencyFee: form.agencyFee === '' ? '' : Number(form.agencyFee),
+      amount: amountYuan()
     })
     logStore.addLog('新建', `创建投标「${form.title}」`, userStore.currentUser?.username || '系统')
     ElMessage.success('投标创建成功')
@@ -150,7 +159,7 @@ function onCancel() { close() }
 function close() {
   Object.assign(form, {
     title: '', desc: '', owner: '', contact: '', deadline: '',
-    priority: '中', stage: 'lead', subStatus: '', agencyFee: ''
+    priority: '中', stage: 'lead', subStatus: '', agencyFee: '', amountWan: ''
   })
   visible.value = false
   emit('update:modelValue', false)

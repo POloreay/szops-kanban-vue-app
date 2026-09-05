@@ -77,10 +77,10 @@
             </svg>
             <div v-else class="chart-placeholder">暂无数据</div>
           </div>
-          <div class="legend-list">
+          <div class="legend-list legend-grid">
             <div class="legend-line" v-for="(seg, i) in donut.segs" :key="i">
               <span class="legend-item"><span class="legend-dot" :style="{ background: seg.color }"></span>{{ seg.label }}</span>
-              <span class="mono-num">{{ seg.count }}</span>
+              <span class="legend-line-right"><span class="legend-pct">{{ seg.pct }}%</span><span class="mono-num">{{ seg.count }}</span></span>
             </div>
           </div>
         </div>
@@ -90,7 +90,7 @@
       <div class="panel">
         <div class="panel-header">
           <div>
-            <h3 class="panel-title">回款全景 · TOP{{ collTop.length }} 项目</h3>
+            <h3 class="panel-title">回款全景 · TOP{{ collTop.length }} 项目<span class="panel-title-unit">（万元）</span></h3>
             <div class="panel-subtitle">底条=合同额 · 覆盖条=累计回款 · 回款率 &lt;30% 标红</div>
           </div>
           <div class="panel-totals">
@@ -115,7 +115,7 @@
       <div class="panels-row">
         <!-- 收支柱状图 TOP5 -->
         <div class="panel">
-          <div class="panel-header"><h3 class="panel-title">收支对比 · 按项目 TOP{{ bars.length }}</h3></div>
+          <div class="panel-header"><h3 class="panel-title">收支对比 · 按项目 TOP{{ bars.length }}<span class="panel-title-unit">（万元）</span></h3></div>
           <div class="chart bar-chart" style="height:220px;" v-if="bars.length">
             <svg viewBox="0 0 600 180" preserveAspectRatio="none" class="bar-svg">
               <g class="chart-grid">
@@ -148,7 +148,7 @@
 
         <!-- 付款/收票/开票概况 -->
         <div class="panel">
-          <div class="panel-header"><h3 class="panel-title">付款 / 收票概况</h3></div>
+          <div class="panel-header"><h3 class="panel-title">付款 / 收票概况<span class="panel-title-unit">（万元）</span></h3></div>
           <div class="rate-list">
             <div class="rate-item" v-for="r in rates" :key="r.label">
               <svg viewBox="0 0 100 100" class="rate-svg">
@@ -169,7 +169,7 @@
       <div class="panels-row">
         <!-- 创建人排名 -->
         <div class="panel">
-          <div class="panel-header"><h3 class="panel-title">创建人排名 · TOP{{ owners.length }}</h3></div>
+          <div class="panel-header"><h3 class="panel-title">创建人排名 · TOP{{ owners.length }}<span class="panel-title-unit">（金额单位：万元）</span></h3></div>
           <div class="budget-col-list" v-if="owners.length">
             <div class="budget-row owner-row" v-for="o in owners" :key="o.name">
               <span class="owner-name">{{ o.name }}</span>
@@ -228,7 +228,18 @@ const filteredActive = computed(() => active.value.filter(t => matchYearMonth(t,
 const selectedProjectIds = ref([])
 const implProjects = computed(() => active.value
   .filter(t => t.status === 'impl')
-  .map(t => ({ id: t.id, title: (t.projectInfo && t.projectInfo.projectName) || t.title || '—', owner: t.owner })))
+  .map(t => {
+    const info = t.projectInfo || {}
+    const planRev = Number(info.planRevenueTax)
+    return {
+      id: t.id,
+      title: info.projectName || t.title || '—',
+      owner: t.owner,
+      planRevText: planRev > 0 ? fmtWan(planRev, 1) : '',
+      year: String(info.createdDate || '').slice(0, 4),
+      pm: String(info.pmName || '').trim()
+    }
+  }))
 const scopeActive = computed(() => selectedProjectIds.value.length
   ? filteredActive.value.filter(t => selectedProjectIds.value.includes(t.id))
   : filteredActive.value)
@@ -249,7 +260,7 @@ const kpis = computed(() => {
   const rate = totalInvoice > 0 ? totalCollectionYuan.value / totalInvoice : 0
   return [
     { label: '在执行项目', value: scopeActive.value.length, sub: `前期 ${talk} · 采购 ${proc} · 实施 ${impl}` },
-    { label: '合同总额（万元）', value: totalContractYuan.value ? fmtWan(totalContractYuan.value, 0) : '—', sub: '含税口径' },
+    { label: '合同总额（万元）', value: totalContractYuan.value ? fmtWan(totalContractYuan.value, 0) : '—', sub: '不含税口径（与项目管理一致）' },
     { label: '累计回款率', value: totalInvoice ? (rate * 100).toFixed(1) + '%' : '—', sub: totalInvoice ? `收款 ${fmtWan(totalCollectionYuan.value, 0)} / 开票 ${fmtWan(totalInvoice, 0)}` : '暂无开票数据' },
     { label: '逾期风险项目', value: overdue, sub: overdue ? `待决策 ${scopeActive.value.filter(t => t.needDecision).length} 个 · 最长逾期 ${Math.max(...overdueRank(scopeActive.value).map(r => r.days))} 天` : `待决策 ${scopeActive.value.filter(t => t.needDecision).length} 个` }
   ]
@@ -299,6 +310,7 @@ const donut = computed(() => {
     const len = count / total * C
     const seg = {
       label, count,
+      pct: Math.round(count / total * 100),
       color: label === '一般项目' ? 'var(--muted)' : palette[i % palette.length],
       dash: `${len} ${C}`,
       offset: -acc
@@ -454,6 +466,26 @@ const overdueList = computed(() => overdueRank(scopeActive.value).slice(0, 6))
   gap: 6px;
   font-size: 12px;
   margin-top: var(--space-2);
+}
+
+// 双列图例（战新分布）
+.legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px var(--space-4);
+}
+
+.legend-line-right {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.legend-pct {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .legend-line {

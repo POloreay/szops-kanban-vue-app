@@ -159,11 +159,11 @@ import { useTaskStore } from '../stores/taskStore'
 import { useLogStore } from '../stores/logStore'
 import { useUserStore } from '../stores/userStore'
 import { STATUS_NAMES, LIST_COLUMNS, LIST_COLUMNS_DEFAULT, LIST_COLUMNS_STORAGE_KEY, BUILD_STATUS_BADGE } from '../utils/constants'
-import { isArchivedTask, isClosedProject, isOverdue } from '../utils/business'
+import { isArchivedTask, isClosedProject } from '../utils/business'
 import {
   activeTasks, matchYearMonth, contractAmountOf, fmtWan,
   collectionRateOf, revDoneRateOf, costExecRateOf, marginGapOf, metricsOf,
-  riskList, yearOptions
+  riskList, yearOptions, planOverdue
 } from '../utils/finance'
 import { fmtMoney } from '../utils/business'
 import TaskFormModal from '../components/kanban/TaskFormModal.vue'
@@ -232,7 +232,7 @@ const kpis = computed(() => {
   const proc = list.filter(t => t.status === 'proc').length
   const impl = list.filter(t => t.status === 'impl').length
   const high = list.filter(t => t.priority === 'high').length
-  const overdue = list.filter(t => isOverdue(t)).length
+  const overdue = list.filter(t => planOverdue(t)).length
   // 指标口径：仅统计当前列表
   const m = list.map(t => metricsOf(t))
   const contract = m.reduce((a, x) => a + x.contract, 0)
@@ -249,7 +249,7 @@ const kpis = computed(() => {
     { label: '回款率', value: inv > 0 ? (col / inv * 100).toFixed(1) + '%' : '—', sub: inv > 0 ? `收款 ${fmtWan(col, 0)} / 开票 ${fmtWan(inv, 0)} 万` : '暂无开票数据' },
     { label: '收入完成率', value: planRev > 0 ? (ledgerRev / planRev * 100).toFixed(1) + '%' : '—', sub: planRev > 0 ? `列账 ${fmtWan(ledgerRev, 0)} / 计划 ${fmtWan(planRev, 0)} 万` : '暂无计划收入' },
     { label: '成本执行率', value: planCost > 0 ? (actualCost / planCost * 100).toFixed(1) + '%' : '—', sub: planCost > 0 ? `实际 ${fmtWan(actualCost, 0)} / 计划 ${fmtWan(planCost, 0)} 万${actualCost > planCost ? ' · 超支' : ''}` : '暂无计划成本' },
-    { label: '逾期风险', value: overdue, sub: `待决策 ${list.filter(t => t.needDecision).length} · 高优先级 ${high}` }
+    { label: '逾期风险', value: overdue, sub: `计划完成已过期在建 · 待决策 ${list.filter(t => t.needDecision).length} · 高优先级 ${high}` }
   ]
 })
 

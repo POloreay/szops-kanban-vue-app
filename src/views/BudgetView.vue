@@ -83,7 +83,7 @@
         <div class="panel-header">
           <div>
             <h3 class="panel-title">预算 {{ rows.length }} 组对照 · 按项目</h3>
-            <div class="panel-subtitle">计划 vs 实际 · 收入 / 成本 / 毛利率</div>
+            <div class="panel-subtitle">计划 vs 实际 · 收入 / 成本 / 毛利率 · 金额单位：万元</div>
           </div>
           <div class="budget-legend">
             <span class="legend-item"><span class="legend-dot plan-dot"></span>计划</span>
@@ -100,12 +100,12 @@
               <span class="budget-card-tag" :class="r.tagCls"><span class="dot"></span>{{ r.tagText }}</span>
             </div>
             <div class="budget-mini">
-              <span class="budget-mini-label"><i style="background: var(--chart-teal);"></i>收入</span>
+              <span class="budget-mini-label"><i style="background: var(--chart-teal);"></i>收入(万)</span>
               <div class="budget-mini-bar"><i class="income" :style="{ width: r.revBar + '%' }"></i></div>
               <span class="budget-mini-nums"><b>{{ numText(r.actualRev) }}</b> / {{ numText(r.planRev) }}</span>
             </div>
             <div class="budget-mini">
-              <span class="budget-mini-label"><i :style="{ background: r.costOver ? 'var(--bad)' : 'var(--chart-orange)' }"></i>成本</span>
+              <span class="budget-mini-label"><i :style="{ background: r.costOver ? 'var(--bad)' : 'var(--chart-orange)' }"></i>成本(万)</span>
               <div class="budget-mini-bar"><i class="cost" :class="{ over: r.costOver }" :style="{ width: r.costBar + '%' }"></i></div>
               <span class="budget-mini-nums"><b :class="{ over: r.costOver }">{{ numText(r.actualCost) }}</b> / {{ numText(r.planCost) }}</span>
             </div>

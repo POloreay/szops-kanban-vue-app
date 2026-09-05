@@ -23,7 +23,7 @@
     <!-- 轮盘：统计范围选择弹层 -->
     <div v-if="scopeOpen" class="scope-panel">
       <div class="scope-head">
-        <span class="scope-title">统计范围（默认全部项目 · 含已关闭）</span>
+        <span class="scope-title">统计范围（默认全部项目 · 含已关闭 · 金额单位：万元）</span>
         <button class="scope-reset" type="button" @click="resetScope">恢复默认</button>
       </div>
       <div class="scope-filters">
@@ -66,15 +66,15 @@
           <tr>
             <th>{{ dimLabel }}</th>
             <th>项目数</th>
-            <th>合同金额</th>
-            <th>计划收入</th>
-            <th>列账收入</th>
+            <th>合同金额<br><span class="th-unit">（万元）</span></th>
+            <th>计划收入<br><span class="th-unit">（万元）</span></th>
+            <th>列账收入<br><span class="th-unit">（万元）</span></th>
             <th>收入完成率</th>
-            <th>累计开票</th>
-            <th>累计收款</th>
+            <th>累计开票<br><span class="th-unit">（万元）</span></th>
+            <th>累计收款<br><span class="th-unit">（万元）</span></th>
             <th>回款率</th>
-            <th>计划成本</th>
-            <th>实际成本</th>
+            <th>计划成本<br><span class="th-unit">（万元）</span></th>
+            <th>实际成本<br><span class="th-unit">（万元）</span></th>
             <th>成本执行率</th>
             <th>计划毛利率</th>
             <th>实际毛利率</th>

@@ -44,19 +44,35 @@
           <div v-if="lifecycleOverdue" class="lc-warn">⚠ 计划完成时间已过，项目仍在建，请关注交付风险</div>
         </div>
 
-        <!-- 基本信息 -->
-        <div class="drawer-section">
-          <div class="drawer-section-title">基本信息</div>
-          <div class="drawer-info-grid">
-            <div class="info-item"><span class="info-label">创建人</span><span class="info-value">{{ task.owner || '—' }}</span></div>
-            <div class="info-item"><span class="info-label">联系人</span><span class="info-value">{{ task.contact || '—' }}</span></div>
-            <div class="info-item"><span class="info-label">截止日期</span><span class="info-value mono">{{ task.deadline || '—' }}</span></div>
-            <div class="info-item"><span class="info-label">剩余天数</span><span class="info-value mono" :style="{ color: daysColor }">{{ daysText }}</span></div>
-            <div class="info-item"><span class="info-label">优先级</span><span class="info-value"><span class="g-pill" :class="priorityClass" style="margin:0;">{{ PRIORITY_NAMES[task.priority] || '中' }}</span></span></div>
-            <div class="info-item"><span class="info-label">当前子状态</span><span class="info-value">{{ subStatusText }}</span></div>
-            <div class="info-item" v-if="task.needDecision"><span class="info-label">需要决策</span><span class="info-value"><span class="g-pill bad" style="margin:0;">⚑ 是</span></span></div>
-            <div class="info-item" v-if="task.agencyFee !== '' && task.agencyFee != null"><span class="info-label">项目代理服务费(元)</span><span class="info-value mono">{{ fmtMoney(task.agencyFee) }}</span></div>
+        <!-- 实施双通道进展（仅实施环节项目） -->
+        <div class="drawer-section" v-if="task.status === 'impl'">
+          <div class="drawer-section-title">实施双通道进展</div>
+          <div class="impl-dual">
+            <div class="impl-lane">
+              <div class="impl-lane-head"><span class="impl-lane-tag delivery">交付通道</span><span class="impl-lane-cur">{{ task.implSub1 || '项目交付' }}</span></div>
+              <div class="impl-track">
+                <template v-for="(s, i) in IMPL_SUBS_PATH1" :key="s">
+                  <span class="impl-step" :class="implStepCls(task.implSub1, s, IMPL_SUBS_PATH1)">{{ s }}</span>
+                  <span v-if="i < IMPL_SUBS_PATH1.length - 1" class="impl-arrow">→</span>
+                </template>
+              </div>
+            </div>
+            <div class="impl-lane">
+              <div class="impl-lane-head"><span class="impl-lane-tag finance">财务通道</span><span class="impl-lane-cur">{{ task.implSub2 || '财务开票' }}</span></div>
+              <div class="impl-track">
+                <template v-for="(s, i) in IMPL_SUBS_PATH2" :key="s">
+                  <span class="impl-step" :class="implStepCls(task.implSub2, s, IMPL_SUBS_PATH2)">{{ s }}</span>
+                  <span v-if="i < IMPL_SUBS_PATH2.length - 1" class="impl-arrow">→</span>
+                </template>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <!-- 非实施环节子状态 -->
+        <div class="drawer-section" v-if="task.status !== 'impl' && task.subStatus">
+          <div class="drawer-section-title">子状态</div>
+          <span class="g-pill" style="margin:0;">{{ task.subStatus }}</span>
         </div>
 
         <!-- 描述 -->
@@ -111,8 +127,8 @@
 <script setup>
 import { computed, ref, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
-import { STATUS_ORDER, STATUS_NAMES, PRIORITY_NAMES, XLS_FIELDS } from '../../utils/constants'
-import { getDaysLeft, isOverdue, isWarn, fmtMoney } from '../../utils/business'
+import { STATUS_ORDER, STATUS_NAMES, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, XLS_FIELDS } from '../../utils/constants'
+import { fmtMoney } from '../../utils/business'
 import { useTaskStore } from '../../stores/taskStore'
 import { useLogStore } from '../../stores/logStore'
 import { useUserStore } from '../../stores/userStore'
@@ -158,28 +174,14 @@ function stepDone(s) {
   return STATUS_IDX[s] < STATUS_IDX[props.task?.status]
 }
 
-const daysLeft = computed(() => props.task ? getDaysLeft(props.task.deadline) : 0)
-const daysText = computed(() => {
-  if (!props.task?.deadline) return '—'
-  return daysLeft.value < 0 ? `已逾期 ${Math.abs(daysLeft.value)} 天` : `剩余 ${daysLeft.value} 天`
-})
-const daysColor = computed(() => {
-  if (!props.task?.deadline) return 'var(--muted)'
-  if (isOverdue(props.task)) return 'var(--bad)'
-  if (isWarn(props.task)) return 'var(--warn)'
-  return 'var(--good)'
-})
-
-const priorityClass = computed(() => ({
-  high: 'bad', medium: 'warn', low: 'good'
-}[props.task?.priority] || 'warn'))
-
-const subStatusText = computed(() => {
-  const t = props.task
-  if (!t) return '—'
-  if (t.status === 'impl') return `${t.implSub1 || '项目交付'} · ${t.implSub2 || '财务开票'}`
-  return t.subStatus || '未指定'
-})
+// 实施双通道步骤样式：当前项高亮，已完成置绿
+function implStepCls(cur, s, path) {
+  const ci = path.indexOf(cur)
+  const si = path.indexOf(s)
+  if (cur && si === ci) return 'cur'
+  if (ci >= 0 && si < ci) return 'done'
+  return ''
+}
 
 const projectInfoItems = computed(() => {
   const info = props.task?.projectInfo || {}
@@ -511,6 +513,79 @@ const lifecycleOverdue = computed(() => {
 }
 
 .milestone-list { display: flex; flex-direction: column; gap: var(--space-3); }
+
+// ===== 实施双通道进展 =====
+.impl-dual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.impl-lane {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.impl-lane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.impl-lane-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+
+  &.delivery {
+    color: var(--biz-blue);
+    background: color-mix(in oklch, var(--biz-blue) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--biz-blue) 28%, transparent);
+  }
+  &.finance {
+    color: var(--chart-gold);
+    background: color-mix(in oklch, var(--chart-gold) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--chart-gold) 28%, transparent);
+  }
+}
+
+.impl-lane-cur {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.impl-track {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.impl-step {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+
+  &.done {
+    color: var(--good);
+    border-color: color-mix(in oklch, var(--good) 24%, transparent);
+  }
+  &.cur {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-color: color-mix(in oklch, var(--accent) 30%, transparent);
+    font-weight: 600;
+  }
+}
+
+.impl-arrow { color: var(--border); font-size: 11px; }
 
 .milestone {
   display: flex;
