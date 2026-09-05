@@ -22,7 +22,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHashHistory('/szops-kanban/'),
+  history: createWebHashHistory('/szops-kanban-vue-app/'),
   routes
 })
 

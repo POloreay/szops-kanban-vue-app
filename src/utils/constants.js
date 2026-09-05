@@ -289,6 +289,6 @@ export const HEADER_COLORS = [
 
 export const HEADER_ICONS = ['📊', '📋', '🏢', '💼', '🚀', '⚡', '🎯', '🔮', '💡', '🗂', '📁', '📈', '🔧', '🎨', '🌟', '💎', '🏆', '🔔', '🖊', '🖥']
 
-// Supabase 云配置
-export const SUPABASE_URL = 'https://iauyjnujldspveynwmxt.supabase.co'
-export const SUPABASE_KEY = 'sb_publishable_YmEn345fUTisJqtkiAaoGg_FkwUGdvc'
+// Supabase 云配置（新独立项目，与旧版 szops-kanban 数据完全隔离）
+export const SUPABASE_URL = 'https://uwfvgrvrxewpkdmbborx.supabase.co'
+export const SUPABASE_KEY = 'sb_publishable_x9xfl5o7isL_UtqJFaTzBw_PU-bGKRd'
