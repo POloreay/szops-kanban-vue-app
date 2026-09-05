@@ -1,0 +1,132 @@
+// ========== 全局色板（Neutral Modern / SaaS Clean Light 浅色主题） ==========
+// 参考设计稿 szops-kanban-p0_v1.html 的设计令牌
+
+:root {
+  // 基础背景
+  --bg:      #fafafa;
+  --surface: #ffffff;
+
+  // 前景文字
+  --fg:      #111111;
+  --muted:   #6b6b6b;
+
+  // 主色（蓝色）
+  --accent:        #2f6feb;
+  --accent-soft:   color-mix(in oklch, #2f6feb 8%, transparent);
+  --accent-on:     #ffffff;
+
+  // 语义色
+  --good:    #17a34a;
+  --warn:    #eab308;
+  --bad:     #dc2626;
+  --info:    #3b82f6;
+  --purple:  #a855f7;
+
+  // 语义柔和色（任务卡色条降饱和）
+  --good-soft: color-mix(in oklch, #17a34a 82%, white 8%);
+  --warn-soft: color-mix(in oklch, #eab308 78%, white 10%);
+  --bad-soft:  color-mix(in oklch, #dc2626 80%, white 8%);
+
+  // 图表扩展色（仪表盘彩色化）
+  --chart-orange: #f97316;
+  --chart-gold:   #d9a520;
+  --chart-teal:   #2fb380;
+  --chart-sky:    #38bdf8;
+  --chart-rose:   #f472b6;
+
+  // 业务配色（方案M · 对齐用户Excel填充色）
+  --biz-blue:  #4472C4; // 计划收入
+  --biz-teal:  #11799E; // 列账收入 / 投标段
+  --biz-green: #A9D08E; // 计划成本（浅底配深字）
+  --biz-cyan:  #D0F0FF; // 实际成本（浅底配深字）
+  --biz-red:   #C00000; // 预警红（回款预警）
+  --biz-ink:   #33502a; // 浅色段上的深色文字
+
+  // 边框
+  --border:  #e5e5e5;
+
+  // 阴影
+  --elev-raised: 0 2px 8px color-mix(in oklch, #111111 8%, transparent);
+
+  // 焦点环
+  --focus-ring: 0 0 0 3px color-mix(in oklch, #2f6feb 18%, transparent);
+
+  // 间距（4px 基准）
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-12: 48px;
+
+  // 圆角
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-pill: 9999px;
+
+  // 字号
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-lg:   16px;
+  --text-xl:   18px;
+  --text-2xl:  24px;
+
+  // 字体
+  --font-display: 'Inter', -apple-system, system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+
+  // 动画
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  // 环节色（与旧版状态一致）
+  --status-talk: #6b6b6b;
+  --status-bid:  #2f6feb;
+  --status-proc: #eab308;
+  --status-impl: #17a34a;
+
+  // 兼容旧变量名（供现有组件平滑过渡）
+  --bg-page:    var(--bg);
+  --bg-layout:  var(--surface);
+  --bg-card:    var(--surface);
+  --bg-hover:   var(--bg);
+  --primary:       var(--accent);
+  --primary-hover: #1d59d9;
+  --primary-dim:   var(--accent-soft);
+  --gold:      var(--warn);
+  --gold-dim:  color-mix(in oklch, #eab308 10%, transparent);
+  --success:   var(--good);
+  --warning:   var(--warn);
+  --danger:    var(--bad);
+  --text-main:    var(--fg);
+  --text-second:  var(--muted);
+  --text-muted:   var(--muted);
+  --border-light: color-mix(in oklch, #e5e5e5 50%, transparent);
+
+  // Element Plus 浅色变量覆盖
+  --el-color-primary: #2f6feb;
+  --el-color-primary-light-3: color-mix(in oklch, #2f6feb 70%, white);
+  --el-color-primary-light-5: color-mix(in oklch, #2f6feb 50%, white);
+  --el-color-primary-light-7: color-mix(in oklch, #2f6feb 30%, white);
+  --el-color-primary-light-9: color-mix(in oklch, #2f6feb 10%, white);
+  --el-color-primary-dark-2: #1d59d9;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #fafafa;
+  --el-bg-color-overlay: #ffffff;
+  --el-text-color-primary: #111111;
+  --el-text-color-regular: #6b6b6b;
+  --el-text-color-secondary: #9b9b9b;
+  --el-text-color-placeholder: #9b9b9b;
+  --el-border-color: #e5e5e5;
+  --el-border-color-light: #ededed;
+  --el-border-color-lighter: #f0f0f0;
+  --el-fill-color: #f5f5f5;
+  --el-fill-color-light: #fafafa;
+  --el-fill-color-lighter: #fafafa;
+  --el-fill-color-blank: #ffffff;
+  --el-mask-color: rgba(17, 17, 17, 0.4);
+  --el-overlay-color: rgba(17, 17, 17, 0.4);
+}
