@@ -131,6 +131,7 @@
                 <td v-for="c in activeCols" :key="c.key" :class="cellClass(t, c)" :style="{ minWidth: colMinWidth(c) }">
                   <span v-if="c.fmt === 'rate'" :style="rateStyle(t, c)">{{ cellText(t, c) }}</span>
                   <span v-else-if="c.key === 'buildStatus'" class="g-pill" :class="badgePill(t)"><span class="dot" :style="{ background: badgeDot(t) }"></span>{{ cellText(t, c) }}</span>
+                  <span v-else-if="c.key === 'clientName'" class="cell-client" :title="cellText(t, c)">{{ cellText(t, c) }}</span>
                   <span v-else>{{ cellText(t, c) }}</span>
                 </td>
                 <td>
@@ -251,10 +252,11 @@ const kpis = computed(() => {
   ]
 })
 
-// 动态列最小宽度：保证项目经理三字名、主标签四字战新标识不换行
+// 动态列最小宽度：保证项目经理三字名、主标签四字战新标识不换行；客户名称给足宽度
 function colMinWidth(c) {
   if (c?.key === 'pmName') return '72px'
   if (c?.key === 'mainTag') return '86px'
+  if (c?.key === 'clientName') return '150px'
   return ''
 }
 
@@ -523,6 +525,18 @@ function onAnalysisJump() {
 }
 
 .cell-text { font-size: 13px; }
+
+// 客户名称列：最多 3 行，超出省略号
+.cell-client {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-all;
+  max-height: 58px;
+}
 
 // 已关闭行淡显
 .row-closed td { opacity: 0.62; }

@@ -116,7 +116,7 @@
         <!-- 收支柱状图 TOP5 -->
         <div class="panel">
           <div class="panel-header"><h3 class="panel-title">收支对比 · 按项目 TOP{{ bars.length }}<span class="panel-title-unit">（万元）</span></h3></div>
-          <div class="chart bar-chart" style="height:220px;" v-if="bars.length">
+          <div class="chart bar-chart" style="height:246px;" v-if="bars.length">
             <svg viewBox="0 0 600 180" preserveAspectRatio="none" class="bar-svg">
               <g class="chart-grid">
                 <line x1="40" y1="20" x2="600" y2="20" />
@@ -134,7 +134,7 @@
               <line x1="40" y1="140" x2="600" y2="140" stroke="var(--fg)" stroke-width="1" />
             </svg>
             <div class="bar-labels">
-              <span class="bar-label" v-for="(g, gi) in barGroups" :key="gi" :style="{ left: g.labelLeft }">{{ g.name }}</span>
+              <span class="bar-label" v-for="(g, gi) in barGroups" :key="gi" :title="g.name" :style="{ left: g.labelLeft, width: g.labelWidth }">{{ g.name }}</span>
             </div>
           </div>
           <div v-else class="chart-placeholder">暂无收支数据（需导入含计划收入/成本的 Excel）</div>
@@ -349,7 +349,8 @@ const barGroups = computed(() => {
     const h = v => Math.max(v / max * 120, 1)
     return {
       name: b.name,
-      labelLeft: ((cx - 30) / (600 - 60) * 100).toFixed(1) + '%',
+      labelLeft: (cx / 600 * 100).toFixed(1) + '%',
+      labelWidth: Math.min(slot / 600 * 100, 40).toFixed(1) + '%',
       rects: [
         { x: cx - bw * 2 - 3, y: 140 - h(b.planRev), w: bw, h: h(b.planRev), fill: 'var(--biz-blue)' },
         { x: cx - bw - 1, y: 140 - h(b.actualRev), w: bw, h: h(b.actualRev), fill: 'var(--biz-teal)' },
@@ -549,7 +550,7 @@ const overdueList = computed(() => overdueRank(scopeActive.value).slice(0, 6))
   top: 0;
   left: 0;
   width: 100%;
-  height: calc(100% - 30px);
+  height: calc(100% - 56px);
 }
 
 .rate-list {

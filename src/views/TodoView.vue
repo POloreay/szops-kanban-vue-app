@@ -18,16 +18,12 @@
         <span class="stat-chip static soon">临近 <b>{{ soonCount }}</b></span>
         <span class="stat-chip static done">已完成 <b>{{ doneCount }}</b></span>
       </div>
-      <div class="toolbar-actions">
-        <label class="only-mine">
-          <input type="checkbox" v-model="onlyMine" />
-          只看我的
-        </label>
-        <button class="btn-uni" @click="openAdd">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          新增待办
-        </button>
-      </div>
+        <div class="toolbar-actions">
+          <button class="btn-uni" @click="openAdd">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            新增待办
+          </button>
+        </div>
     </div>
 
     <div class="todo-layout">
@@ -60,7 +56,7 @@
         <div class="panel-header">
           <div>
             <h3 class="panel-title">{{ calFilterDay !== null ? `${calFilterDay} 日待办` : '全部待办' }}</h3>
-            <div class="panel-subtitle">{{ visibleTodos.length }} 条{{ onlyMine ? ' · 仅本人' : '' }}{{ calFilterDay !== null ? ' · 点击日期可取消筛选' : '' }}</div>
+            <div class="panel-subtitle">{{ visibleTodos.length }} 条 · 仅显示本人创建{{ calFilterDay !== null ? ' · 点击日期可取消筛选' : '' }}</div>
           </div>
           <div class="seg-group">
             <button class="seg-btn" :class="{ on: tab === 'todo' }" @click="tab = 'todo'">进行中 {{ undone.length }}</button>
@@ -87,23 +83,23 @@
               class="todo-item"
               :class="{ done: t.done }"
             >
-              <button class="check" :class="{ checked: t.done }" type="button" @click="onToggle(t)" :aria-label="t.done ? '标记未完成' : '标记完成'">
+              <button class="check" :class="{ checked: t.done }" type="button" :disabled="!canToggle(t)" @click="onToggle(t)" :aria-label="t.done ? '标记未完成' : '标记完成'" :title="canToggle(t) ? '' : '仅创建人可操作'">
                 <svg v-if="t.done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
               </button>
               <div class="todo-main">
                 <div class="todo-content">{{ t.content }}</div>
                 <div class="todo-meta">
-                  <span class="owner-chip">{{ t.owner || '未指派' }}</span>
+                  <span class="owner-chip">我</span>
                   <span v-if="t.deadline" class="deadline" :class="urgencyOf(t).cls">{{ t.deadline }}{{ t.time ? ' ' + t.time : '' }}</span>
                   <span v-if="t.done" class="done-tag">已完成</span>
                   <span v-else class="urgent-tag" :class="urgencyOf(t).cls">{{ urgencyOf(t).text }}</span>
                 </div>
               </div>
               <div class="todo-actions">
-                <button class="icon-btn" type="button" title="编辑" @click="openEdit(t)">
+                <button v-if="canManage(t)" class="icon-btn" type="button" title="编辑" @click="openEdit(t)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 </button>
-                <button class="icon-btn danger" type="button" title="删除" @click="onDelete(t)">
+                <button v-if="canManage(t)" class="icon-btn danger" type="button" title="删除" @click="onDelete(t)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                 </button>
               </div>
@@ -137,8 +133,8 @@
                 <div class="form-row"><label>时间</label><input class="form-input" v-model="form.time" type="time" /></div>
               </div>
               <div class="form-row">
-                <label>负责人</label>
-                <input class="form-input" v-model.trim="form.owner" :placeholder="defaultOwner" />
+                <label>负责人（创建人，固定为当前账号）</label>
+                <input class="form-input" :value="defaultOwner" disabled />
               </div>
             </div>
             <div class="modal-footer">
@@ -228,16 +224,17 @@ const calCells = computed(() => {
 })
 
 // ===== 筛选 =====
-const onlyMine = ref(false)
+// 权限口径：个人待办仅显示当前账号创建的待办（owner === 当前用户名）
 const tab = ref('todo')
 
-const allTodos = computed(() => todoStore.todos)
+const allTodos = computed(() => {
+  const me = userStore.currentUser?.username
+  if (!me) return []
+  return todoStore.todos.filter(t => t.owner === me)
+})
 
 const baseList = computed(() => {
   let list = allTodos.value
-  if (onlyMine.value && userStore.currentUser) {
-    list = list.filter(t => t.owner === userStore.currentUser.username)
-  }
   if (calFilterDay.value) {
     list = list.filter(t => t.deadline === calFilterDay.value)
   }
@@ -302,7 +299,7 @@ const soonCount = computed(() => allTodos.value.filter(t => !t.done && urgencyOf
 // ===== CRUD =====
 const showForm = ref(false)
 const editingId = ref(null)
-const form = ref({ content: '', deadline: '', time: '', owner: '' })
+const form = ref({ content: '', deadline: '', time: '' })
 
 const defaultOwner = computed(() => userStore.currentUser?.username || '')
 
@@ -315,15 +312,14 @@ function openAdd() {
   form.value = {
     content: '',
     deadline: calFilterDay.value || '',
-    time: '',
-    owner: defaultOwner.value
+    time: ''
   }
   showForm.value = true
 }
 
 function openEdit(t) {
   editingId.value = t.id
-  form.value = { content: t.content, deadline: t.deadline || '', time: t.time || '', owner: t.owner || '' }
+  form.value = { content: t.content, deadline: t.deadline || '', time: t.time || '' }
   showForm.value = true
 }
 
@@ -342,7 +338,6 @@ function onSubmit() {
       content: form.value.content,
       deadline: form.value.deadline,
       time: form.value.time,
-      owner: form.value.owner,
       updatedAt: new Date().toISOString()
     })
     ElMessage.success('待办已更新')
@@ -351,7 +346,7 @@ function onSubmit() {
       content: form.value.content,
       deadline: form.value.deadline,
       time: form.value.time,
-      owner: form.value.owner || defaultOwner.value
+      owner: defaultOwner.value
     })
     ElMessage.success('待办已创建')
   }
@@ -369,8 +364,20 @@ async function onDelete(t) {
 }
 
 function onToggle(t) {
+  // 仅创建人本人可标记完成/取消完成
+  if (!canToggle(t)) {
+    ElMessage.warning('仅创建人本人可操作此待办')
+    return
+  }
   todoStore.updateTodo(t.id, { done: !t.done, updatedAt: new Date().toISOString() })
 }
+
+// 权限：是否本人创建
+function isMine(t) {
+  return !!userStore.currentUser && t.owner === userStore.currentUser.username
+}
+const canToggle = isMine
+const canManage = isMine
 </script>
 
 <style scoped lang="scss">
@@ -465,17 +472,6 @@ function onToggle(t) {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-}
-
-.only-mine {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--muted);
-  cursor: pointer;
-
-  input { accent-color: var(--accent); cursor: pointer; }
 }
 
 // ===== 布局 =====
@@ -692,6 +688,12 @@ function onToggle(t) {
   svg { width: 11px; height: 11px; }
 
   &:hover { border-color: var(--accent); }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    &:hover { border-color: var(--border); }
+  }
 
   &.checked {
     background: var(--good);

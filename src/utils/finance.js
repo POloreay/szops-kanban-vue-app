@@ -195,7 +195,7 @@ export function barTopN(tasks, n = 5) {
       const fullName = (info.projectName || t.title || '—')
       return {
         id: t.id,
-        name: fullName.length > 6 ? fullName.slice(0, 6) : fullName,
+        name: fullName,
         fullName,
         planRev: toWan(info.planRevenueTax),
         actualRev: toWan(info.ledgerRevenueTax),

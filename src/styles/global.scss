@@ -258,15 +258,24 @@ a {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 30px;
+  height: 56px;
+  display: flex;
+  align-items: flex-start;
 }
 .bar-label {
   position: absolute;
   transform: translateX(-50%);
   font-size: 10px;
+  line-height: 13px;
   color: var(--muted);
   font-family: var(--font-mono);
-  white-space: nowrap;
+  text-align: center;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .chart-grid line {
   stroke: var(--border);
