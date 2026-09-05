@@ -52,25 +52,60 @@ export const ARCHIVE_SUBS = ['落标归档', '归档结束', '流标', '项目�
 // Excel 批量导入列（以用户导出 Excel 为基准，10 列）
 export const EXCEL_COLS = ['项目名称', '描述', '创建人', '联系人', '优先级', '截止日期', '状态', '子状态', '需要决策', '项目代理服务费(元)']
 
+// ===== 系统项目状态（XLS「项目状态」字段）→ 看板阶段映射 =====
+// 未开工→前期环节；在建→实施环节；完工/验收/业务关闭/财务关闭→实施环节+归档（isArchivedTask 识别）
+export const BUILD_STATUS_LIST = ['未开工', '在建', '完工', '验收', '业务关闭', '财务关闭']
+export const CLOSED_BUILD_STATUS = ['完工', '验收', '业务关闭', '财务关闭']
+// 状态徽标配色：未开工灰 / 在建蓝 / 完工青 / 验收绿 / 业务关闭橙 / 财务关闭深灰
+export const BUILD_STATUS_BADGE = {
+  '未开工': { pill: '', dot: 'var(--muted)' },
+  '在建': { pill: 'accent', dot: 'var(--accent)' },
+  '完工': { pill: 'good', dot: 'var(--chart-teal)' },
+  '验收': { pill: 'good', dot: 'var(--good)' },
+  '业务关闭': { pill: 'warn', dot: 'var(--chart-orange)' },
+  '财务关闭': { pill: '', dot: 'var(--muted)' }
+}
+// 项目状态 → 看板阶段（导入时自动分配）
+export function stageByBuildStatus(bs) {
+  if (bs === '未开工') return 'talk'
+  if (CLOSED_BUILD_STATUS.includes(bs)) return 'impl' // 归档由 isClosedProject 识别
+  if (bs === '在建') return 'impl'
+  return '' // 未知/空值由调用方回退旧规则
+}
 // 项目总览列表：可配置列（默认显示14个字段；固定列「序号/项目名称/状态/操作」不在此配置范围）
-// fmt: text 纯文本 | money 元→万元格式化 | pill 优先级标签 | date 日期
+// fmt: text 纯文本 | money 元→万元格式化 | pill 优先级标签 | date 日期 | pct 百分比 | rate 比率列（带颜色阈值）
 export const LIST_COLUMNS = [
   { key: 'projectId', label: '项目编号', fmt: 'text' },
   { key: 'buildStatus', label: '项目状态', fmt: 'text' },
   { key: 'pmName', label: '项目经理', fmt: 'text' },
   { key: 'clientName', label: '客户名称', fmt: 'text' },
   { key: 'mainTag', label: '主标签（战新）', fmt: 'text' },
-  { key: 'actualGrossMargin', label: '实际毛利率%', fmt: 'num' },
-  { key: 'accReceipt', label: '累计收票', fmt: 'money' },
-  { key: 'accInvoice', label: '累计开票', fmt: 'money' },
-  { key: 'accPayment', label: '累计付款', fmt: 'money' },
-  { key: 'accCollection', label: '累计收款', fmt: 'money' },
-  { key: 'ledgerRevenueTax', label: '列账收入(含税)', fmt: 'money' },
-  { key: 'planRevenueTax', label: '计划收入(含税)', fmt: 'money' },
   { key: 'contractAmount', label: '合同金额(不含税)', fmt: 'money' },
-  { key: 'createdAt', label: '创建日期', fmt: 'date' }
+  { key: 'planRevenueTax', label: '计划收入(含税)', fmt: 'money' },
+  { key: 'ledgerRevenueTax', label: '列账收入(含税)', fmt: 'money' },
+  { key: 'revDoneRate', label: '收入完成率', fmt: 'rate' },
+  { key: 'accInvoice', label: '累计开票', fmt: 'money' },
+  { key: 'accCollection', label: '累计收款', fmt: 'money' },
+  { key: 'collectionRate', label: '回款率', fmt: 'rate' },
+  { key: 'planCost', label: '计划成本', fmt: 'money' },
+  { key: 'actualCost', label: '实际成本', fmt: 'money' },
+  { key: 'costExecRate', label: '成本执行率', fmt: 'rate' },
+  { key: 'planGrossMargin', label: '计划毛利率', fmt: 'num' },
+  { key: 'actualGrossMargin', label: '实际毛利率', fmt: 'num' },
+  { key: 'marginGap', label: '毛利差(pp)', fmt: 'rate' },
+  { key: 'accPayment', label: '累计付款', fmt: 'money' },
+  { key: 'accReceipt', label: '累计收票', fmt: 'money' },
+  { key: 'createdAt', label: '创建日期', fmt: 'date' },
+  { key: 'auxTag', label: '辅助标签(战新)', fmt: 'text' },
+  { key: 'clientCategory', label: '客户分类', fmt: 'text' },
+  { key: 'workAreaDesc', label: '施工区域', fmt: 'text' },
+  { key: 'planStartDate', label: '计划开始', fmt: 'date' },
+  { key: 'planEndDate', label: '计划完成', fmt: 'date' },
+  { key: 'businessCloseDate', label: '业务关闭日期', fmt: 'date' },
+  { key: 'financeCloseDate', label: '财务关闭日期', fmt: 'date' },
+  { key: 'currentActivity', label: '当前业务活动', fmt: 'text' }
 ]
-export const LIST_COLUMNS_DEFAULT = ['projectId', 'buildStatus', 'pmName', 'clientName', 'mainTag', 'actualGrossMargin', 'accReceipt', 'accInvoice', 'accPayment', 'accCollection', 'ledgerRevenueTax', 'planRevenueTax', 'contractAmount', 'createdAt']
+export const LIST_COLUMNS_DEFAULT = ['projectId', 'buildStatus', 'pmName', 'clientName', 'mainTag', 'contractAmount', 'planRevenueTax', 'ledgerRevenueTax', 'revDoneRate', 'accInvoice', 'accCollection', 'collectionRate', 'planCost', 'actualCost', 'costExecRate', 'planGrossMargin', 'actualGrossMargin', 'marginGap', 'createdAt']
 export const LIST_COLUMNS_STORAGE_KEY = 'szops_list_columns'
 
 // 方案M图表配色（对齐用户Excel填充色）

@@ -32,7 +32,7 @@
               <div class="import-error-box warn" v-if="!importRows.length">文件中未解析到有效数据行</div>
               <template v-else>
                 <div class="import-summary">
-                  已解析 {{ importRows.length }} 条记录，默认全选 · 阶段规则：合同金额(不含税)有值 → <b>实施环节</b>，为空 → <b>前期环节</b>；可逐条勾选或修改阶段；截止日期默认当天
+                  已解析 {{ importRows.length }} 条记录，默认全选 · 阶段规则：<b>按系统「项目状态」自动分配</b>（未开工→前期环节，在建→实施环节，完工/验收/业务关闭/财务关闭→实施环节并自动归档）；无状态时按合同金额回退。可逐条勾选或修改阶段；截止日期默认当天
                 </div>
                 <div class="import-preview-wrap">
                   <table class="ds-table import-preview-table">
@@ -155,7 +155,7 @@
 import { ref, reactive, nextTick, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as XLSX from 'xlsx'
-import { XLS_FIELDS, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2 } from '../../utils/constants'
+import { XLS_FIELDS, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, stageByBuildStatus } from '../../utils/constants'
 import { useTaskStore } from '../../stores/taskStore'
 import { useLogStore } from '../../stores/logStore'
 import { useUserStore } from '../../stores/userStore'
@@ -198,12 +198,25 @@ function pickField(row, label) {
   return ''
 }
 
-// 导入时顺带识别的 XLS 关键字段（写入 projectInfo，供总览列/战新分布使用）
+// 导入时顺带识别的 XLS 关键字段（写入 projectInfo，供总览列/战新分布/指标计算/风险预警使用）
 const IMPORT_XLS_KEYS = [
-  'projectName', 'projectId', 'buildStatus', 'pmName', 'clientName', 'mainTag',
+  'projectName', 'projectId', 'buildStatus', 'pmName', 'clientName', 'mainTag', 'auxTag',
   'actualGrossMargin', 'accReceipt', 'accInvoice', 'accPayment', 'accCollection',
-  'ledgerRevenueTax', 'planRevenueTax', 'contractAmount', 'createdDate'
+  'ledgerRevenueTax', 'planRevenueTax', 'contractAmount', 'createdDate',
+  // 新增：指标计算/进度/归档/风险字段
+  'planRevenueNoTax', 'planCost', 'planGrossMargin', 'ledgerRevenueNoTax',
+  'planStartDate', 'planEndDate', 'businessCloseDate', 'financeCloseDate',
+  'approvalPassDate',
+  'clientCategory', 'workAreaDesc', 'currentActivity', 'isAdvance', 'advanceBudget', 'cancelFlag', 'closeStatus'
 ]
+
+// 项目状态 → 看板阶段（按系统项目状态自动分配；空/未知回退旧规则：合同金额有值→实施，空→前期）
+function stageOfRow(r, contractAmount) {
+  const bs = String((r.xlsInfo && r.xlsInfo.buildStatus) || '').trim()
+  const mapped = stageByBuildStatus(bs)
+  if (mapped) return mapped
+  return contractAmount !== '' && contractAmount !== '0' ? 'impl' : 'talk'
+}
 
 // 当前日期（YYYY-MM-DD）：导入时截止日期默认值
 function todayStr() {
@@ -226,8 +239,6 @@ async function onFileChange(e) {
     }
     importRows.value = rows.map(r => {
       const contractAmount = String(pickField(r, '项目收入合同金额(不含税)') ?? '').trim()
-      // 自动分配阶段：合同金额有值 → 实施；为空 → 前期
-      const stage = contractAmount !== '' && contractAmount !== '0' ? 'impl' : 'talk'
       // 顺带识别 XLS 关键字段
       const xlsInfo = {}
       IMPORT_XLS_KEYS.forEach(k => {
@@ -236,6 +247,8 @@ async function onFileChange(e) {
         const v = String(pickField(r, f.label) ?? '').trim()
         xlsInfo[k] = v
       })
+      // 阶段分配：优先按系统「项目状态」，回退旧规则（合同金额）
+      const stage = stageOfRow({ xlsInfo }, contractAmount)
       return {
         checked: true,
         stage,

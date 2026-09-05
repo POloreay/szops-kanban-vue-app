@@ -2,3 +2,10 @@
 > szops-kanban-vue@1.0.0 dev
 > vite
 
+
+  VITE v5.4.21  ready in 1499 ms
+
+  ➜  Local:   http://localhost:5174/szops-kanban/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+07:27:46 [vite] hmr update /src/components/kanban/TaskFormModal.vue

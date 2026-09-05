@@ -1,6 +1,6 @@
 // ========== 业务工具函数（照搬逻辑文档） ==========
 
-import { ARCHIVE_SUBS, WARN_DAYS } from './constants'
+import { ARCHIVE_SUBS, WARN_DAYS, CLOSED_BUILD_STATUS } from './constants'
 
 // 唯一ID
 export function uid() {
@@ -58,4 +58,15 @@ export function fmtDate(s) {
 export function isArchivedTask(t) {
   if (t.status === 'impl') return false
   return ARCHIVE_SUBS.includes(t.subStatus)
+}
+
+// 系统项目状态是否为「已关闭」终态（完工/验收/业务关闭/财务关闭）——导入项目据此自动归档
+export function isClosedProject(t) {
+  const bs = t?.projectInfo?.buildStatus
+  return CLOSED_BUILD_STATUS.includes(bs)
+}
+
+// 综合归档判定：老规则（落标/流标子状态）或 新规则（系统项目状态已关闭）
+export function isAnyArchived(t) {
+  return isArchivedTask(t) || isClosedProject(t)
 }

@@ -1,7 +1,7 @@
 // ========== 财务数据汇总工具（从 task.projectInfo 动态计算） ==========
 // 单位说明：projectInfo 内金额均为元，视图展示按「万元」换算（/10000）
 
-import { isArchivedTask } from './business'
+import { isArchivedTask, isClosedProject } from './business'
 
 // 项目信息金额字段取值（元 → 数字，空/非法返回 0）
 export function num(v) {
@@ -32,8 +32,18 @@ export function collectionOf(t) {
   return num(t?.projectInfo?.accCollection)
 }
 
-// 有效项目（active，含全部四阶段）
-export function activeTasks(tasks) {
+// 有效项目（active，含全部四阶段；默认排除已关闭项目：落标/流标归档 + 系统项目状态已关闭）
+export function activeTasks(tasks, opts = {}) {
+  const includeClosed = !!opts.includeClosed
+  return tasks.filter(t => {
+    if (isArchivedTask(t)) return false
+    if (!includeClosed && isClosedProject(t)) return false
+    return true
+  })
+}
+
+// 是否显示已关闭项目（总览页开关传递；includeClosed=true 时返回全部，含老归档）
+export function allTasksIncludingClosed(tasks) {
   return tasks.filter(t => !isArchivedTask(t))
 }
 
@@ -254,6 +264,206 @@ export function matchYearMonth(t, year, month) {
   if (year !== 'all' && y !== year) return false
   if (month !== 'all' && m !== month) return false
   return true
+}
+
+// ===== 单项目指标计算（总览页 4 计算列 + 经营分析矩阵共用口径）=====
+// 回款率 = 累计收款 / 累计开票（开票为 0 返回 null）
+export function collectionRateOf(t) {
+  const inv = num(t?.projectInfo?.accInvoice)
+  const col = num(t?.projectInfo?.accCollection)
+  return inv > 0 ? col / inv : null
+}
+// 收入完成率 = 列账收入(含税) / 计划收入(含税)（计划收入为 0 返回 null）
+export function revDoneRateOf(t) {
+  const plan = num(t?.projectInfo?.planRevenueTax)
+  const act = num(t?.projectInfo?.ledgerRevenueTax)
+  return plan > 0 ? act / plan : null
+}
+// 成本执行率 = 实际成本 / 计划成本（计划成本为 0 返回 null）
+export function costExecRateOf(t) {
+  const plan = num(t?.projectInfo?.planCost)
+  const act = num(t?.projectInfo?.actualCost)
+  return plan > 0 ? act / plan : null
+}
+// 毛利差(pp) = 实际毛利率 - 计划毛利率（任一为空返回 null）
+export function marginGapOf(t) {
+  const info = t?.projectInfo || {}
+  const p = String(info.planGrossMargin ?? '').trim()
+  const a = String(info.actualGrossMargin ?? '').trim()
+  if (p === '' || a === '' || isNaN(Number(p)) || isNaN(Number(a))) return null
+  return Number(a) - Number(p)
+}
+// 单项目指标汇总对象（供表格/分析复用）
+export function metricsOf(t) {
+  return {
+    contract: contractAmountOf(t),
+    planRev: num(t?.projectInfo?.planRevenueTax),
+    ledgerRev: num(t?.projectInfo?.ledgerRevenueTax),
+    accInvoice: num(t?.projectInfo?.accInvoice),
+    accCollection: num(t?.projectInfo?.accCollection),
+    planCost: num(t?.projectInfo?.planCost),
+    actualCost: num(t?.projectInfo?.actualCost),
+    planRate: String(t?.projectInfo?.planGrossMargin ?? '').trim() === '' ? null : num(t?.projectInfo?.planGrossMargin),
+    actualRate: String(t?.projectInfo?.actualGrossMargin ?? '').trim() === '' ? null : num(t?.projectInfo?.actualGrossMargin),
+    collectionRate: collectionRateOf(t),
+    revDoneRate: revDoneRateOf(t),
+    costExecRate: costExecRateOf(t),
+    marginGap: marginGapOf(t)
+  }
+}
+
+// ===== 分组指标矩阵（经营分析页：按维度值分组，输出指标行）=====
+// dimKey: 'buildStatus' | 'mainTag' | 'pmName' | 'clientName'
+export function groupMetrics(tasks, dimKey) {
+  const map = new Map()
+  tasks.forEach(t => {
+    const raw = String((t.projectInfo && t.projectInfo[dimKey]) || '').trim()
+    const label = raw || (dimKey === 'mainTag' ? '一般项目' : '未填写')
+    if (!map.has(label)) {
+      map.set(label, { label, count: 0, contract: 0, planRev: 0, ledgerRev: 0, accInvoice: 0, accCollection: 0, planCost: 0, actualCost: 0, planRateSum: 0, planRateN: 0, actualRateSum: 0, actualRateN: 0 })
+    }
+    const g = map.get(label)
+    const m = metricsOf(t)
+    g.count += 1
+    g.contract += m.contract
+    g.planRev += m.planRev
+    g.ledgerRev += m.ledgerRev
+    g.accInvoice += m.accInvoice
+    g.accCollection += m.accCollection
+    g.planCost += m.planCost
+    g.actualCost += m.actualCost
+    if (m.planRate !== null) { g.planRateSum += m.planRate; g.planRateN += 1 }
+    if (m.actualRate !== null) { g.actualRateSum += m.actualRate; g.actualRateN += 1 }
+  })
+  const rows = [...map.values()].map(g => ({
+    ...g,
+    revDoneRate: g.planRev > 0 ? g.ledgerRev / g.planRev : null,
+    collectionRate: g.accInvoice > 0 ? g.accCollection / g.accInvoice : null,
+    costExecRate: g.planCost > 0 ? g.actualCost / g.planCost : null,
+    planRate: g.planRateN ? g.planRateSum / g.planRateN : null,
+    actualRate: g.actualRateN ? g.actualRateSum / g.actualRateN : null,
+    marginGap: (g.planRateN && g.actualRateN) ? (g.actualRateSum / g.actualRateN) - (g.planRateSum / g.planRateN) : null
+  }))
+  // 排序：按合同额降序，「未填写/一般项目」靠后
+  rows.sort((a, b) => {
+    const fallback = l => (l === '未填写' || l === '一般项目') ? 1 : 0
+    if (fallback(a.label) !== fallback(b.label)) return fallback(a.label) - fallback(b.label)
+    return b.contract - a.contract || b.count - a.count
+  })
+  return rows
+}
+
+// 合计行（矩阵底部）
+export function groupMetricsTotal(tasks) {
+  const rows = groupMetrics(tasks, 'projectId') // 每项目一组再聚合等于总体
+  const g = rows.reduce((acc, r) => ({
+    count: acc.count + r.count,
+    contract: acc.contract + r.contract,
+    planRev: acc.planRev + r.planRev,
+    ledgerRev: acc.ledgerRev + r.ledgerRev,
+    accInvoice: acc.accInvoice + r.accInvoice,
+    accCollection: acc.accCollection + r.accCollection,
+    planCost: acc.planCost + r.planCost,
+    actualCost: acc.actualCost + r.actualCost,
+    planRateSum: acc.planRateSum + r.planRateSum,
+    planRateN: acc.planRateN + r.planRateN,
+    actualRateSum: acc.actualRateSum + r.actualRateSum,
+    actualRateN: acc.actualRateN + r.actualRateN
+  }), { count: 0, contract: 0, planRev: 0, ledgerRev: 0, accInvoice: 0, accCollection: 0, planCost: 0, actualCost: 0, planRateSum: 0, planRateN: 0, actualRateSum: 0, actualRateN: 0 })
+  return {
+    ...g,
+    label: '合计',
+    revDoneRate: g.planRev > 0 ? g.ledgerRev / g.planRev : null,
+    collectionRate: g.accInvoice > 0 ? g.accCollection / g.accInvoice : null,
+    costExecRate: g.planCost > 0 ? g.actualCost / g.planCost : null,
+    planRate: g.planRateN ? g.planRateSum / g.planRateN : null,
+    actualRate: g.actualRateN ? g.actualRateSum / g.actualRateN : null,
+    marginGap: (g.planRateN && g.actualRateN) ? (g.actualRateSum / g.actualRateN) - (g.planRateSum / g.planRateN) : null
+  }
+}
+
+// ===== 排名预警清单（经营分析页）=====
+// 回款率最低 TopN（排除开票为 0）
+export function worstCollection(tasks, n = 5) {
+  return tasks
+    .map(t => ({ task: t, rate: collectionRateOf(t) }))
+    .filter(r => r.rate !== null)
+    .sort((a, b) => a.rate - b.rate)
+    .slice(0, n)
+}
+// 实际毛利率最低 TopN（排除毛利率为空/无收入）
+export function worstMargin(tasks, n = 5) {
+  return tasks
+    .map(t => {
+      const info = t.projectInfo || {}
+      const rate = String(info.actualGrossMargin ?? '').trim()
+      return { task: t, rate: rate === '' || isNaN(Number(rate)) ? null : Number(rate) }
+    })
+    .filter(r => r.rate !== null)
+    .sort((a, b) => a.rate - b.rate)
+    .slice(0, n)
+}
+// 超支项目清单（成本执行率>100%）
+export function costOverruns(tasks) {
+  return tasks
+    .map(t => ({ task: t, rate: costExecRateOf(t) }))
+    .filter(r => r.rate !== null && r.rate > 1)
+    .sort((a, b) => b.rate - a.rate)
+}
+// 零收款在建项目（系统状态=在建 且 累计收款=0，按创建日期升序）
+export function zeroCollectionOngoing(tasks) {
+  return tasks
+    .filter(t => t.projectInfo?.buildStatus === '在建' && num(t.projectInfo?.accCollection) === 0)
+    .sort((a, b) => String(a.projectInfo?.createdDate || '').localeCompare(String(b.projectInfo?.createdDate || '')))
+}
+
+// ===== 风险预警（总览页风险中心）=====
+// 是否逾期风险：计划完成时间 < 今天 且 状态=在建
+export function planOverdue(t) {
+  const pe = t?.projectInfo?.planEndDate
+  if (!pe || t?.projectInfo?.buildStatus !== '在建') return false
+  const d = new Date(String(pe).replace(/\//g, '-'))
+  if (isNaN(d)) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  d.setHours(0, 0, 0, 0)
+  return d < today
+}
+// 逾期兜底：无计划日期 + 在建 + 零收款 + 创建超1年
+export function staleOngoing(t) {
+  const info = t?.projectInfo || {}
+  if (info.buildStatus !== '在建') return false
+  if (info.planEndDate) return false
+  if (num(info.accCollection) !== 0) return false
+  const created = String(info.createdDate || '')
+  if (!created) return false
+  const d = new Date(created)
+  if (isNaN(d)) return false
+  const oneYearAgo = new Date()
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+  return d < oneYearAgo
+}
+// 停工预警：当前业务活动含「停工」
+export function isHalted(t) {
+  return String(t?.projectInfo?.currentActivity || '').includes('停工')
+}
+// 全部风险清单（供风险中心渲染）
+export function riskList(tasks) {
+  const list = []
+  tasks.forEach(t => {
+    const info = t.projectInfo || {}
+    if (planOverdue(t)) list.push({ task: t, type: '逾期风险', detail: `计划完成 ${info.planEndDate}，仍在建` })
+    else if (staleOngoing(t)) list.push({ task: t, type: '长期停滞', detail: `创建 ${info.createdDate || '—'}，在建且零收款超1年` })
+    if (isHalted(t)) list.push({ task: t, type: '停工预警', detail: info.currentActivity })
+    if (String(info.isAdvance).trim() === '是') list.push({ task: t, type: '垫资项目', detail: `垫资峰值 ${num(info.advanceBudget) ? fmtWanStatic(num(info.advanceBudget)) + ' 万' : '—'}` })
+    if (String(info.cancelFlag).trim() === 'X') list.push({ task: t, type: '注销标识', detail: '系统标注已注销' })
+    const ce = costExecRateOf(t)
+    if (ce !== null && ce > 1) list.push({ task: t, type: '成本超支', detail: `成本执行率 ${(ce * 100).toFixed(0)}%` })
+  })
+  return list
+}
+function fmtWanStatic(v) {
+  return (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })
 }
 
 // 紧迫度排序（逾期天数降序置顶 → 剩余天数升序）
