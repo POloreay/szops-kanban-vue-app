@@ -25,59 +25,68 @@
     </div>
   </header>
 
-  <el-dialog v-model="showLogin" width="420px" :close-on-click-modal="false" class="login-dialog" :show-close="true" append-to-body>
-    <div class="login-banner">
-      <div class="banner-ribbon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="m3 17 6-6 4 4 8-8" />
-          <path d="M14 7h7v7" />
-        </svg>
+  <!-- 登录：旗舰分屏（方案 B） -->
+  <Teleport to="body">
+    <transition name="login-fade">
+      <div v-if="showLogin" class="login-mask" @click.self="showLogin = false">
+        <div class="b-wrap">
+          <button class="b-close" type="button" aria-label="关闭登录" @click="showLogin = false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+
+          <!-- 左：品牌叙事区 -->
+          <div class="b-left">
+            <div class="b-brandline">
+              <span class="logo">数</span>
+              <span>数智运营看板 · DIGITAL OPERATIONS</span>
+            </div>
+            <div class="b-hero">
+              <div class="b-hello">无敌牛马，<br />欢迎回来！</div>
+              <div class="b-sub">
+                鞍已备好，粮草已足 —— 每一铲都算数。<br />
+                今日份数字粮草已装车，请查收。
+              </div>
+            </div>
+            <div class="b-stats">
+              <div class="b-stat"><div class="v">80</div><div class="l">在管项目</div></div>
+              <div class="b-stat"><div class="v">31,211<span class="unit">万</span></div><div class="l">合同总额</div></div>
+              <div class="b-stat"><div class="v">98%</div><div class="l">按期交付</div></div>
+            </div>
+          </div>
+
+          <!-- 右：登录表单区 -->
+          <div class="b-right">
+            <h3>登录</h3>
+            <div class="b-tip">请登录账号，开工前请系好安全带</div>
+            <input
+              v-model="loginForm.username"
+              class="b-in"
+              type="text"
+              placeholder="用户名"
+              autocomplete="username"
+              @keyup.enter="handleLogin"
+            />
+            <input
+              v-model="loginForm.password"
+              class="b-in"
+              type="password"
+              placeholder="密码"
+              autocomplete="current-password"
+              @keyup.enter="handleLogin"
+            />
+            <button class="b-btn" type="button" @click="handleLogin">开工</button>
+            <div class="b-foot">我能抗住什么责任，我是个溜肩啊......</div>
+          </div>
+        </div>
       </div>
-      <div class="banner-brand">数智运营看板</div>
-      <div class="banner-hello">无敌牛马，欢迎回来！</div>
-      <div class="banner-sub">鞍已备好，粮草已足，请开始今日搬砖</div>
-    </div>
-    <div class="login-body">
-      <el-form @submit.prevent="handleLogin" label-position="top" class="login-form">
-        <el-form-item label="用户名">
-          <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large">
-            <template #prefix>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </template>
-          </el-input>
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" show-password size="large" @keyup.enter="handleLogin">
-            <template #prefix>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect width="18" height="11" x="3" y="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </template>
-          </el-input>
-        </el-form-item>
-      </el-form>
-    </div>
-    <template #footer>
-      <div class="login-footer">
-        <button class="btn btn-secondary login-cancel" type="button" @click="showLogin = false">取消</button>
-        <button class="btn btn-primary login-submit" type="submit" @click="handleLogin">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2Z" />
-          </svg>
-          开工
-        </button>
-      </div>
-      <div class="login-tip">今日宜搬砖 · 忌摸鱼</div>
-    </template>
-  </el-dialog>
+    </transition>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../../stores/userStore'
@@ -103,7 +112,12 @@ const titleMap = {
   '/kanban/procurement': '采购阶段',
   '/kanban/implementation': '实施阶段',
   '/kanban/closed': '已关闭项目',
-  '/bid': '投标管理',
+  '/bid': '投标总览',
+  '/bid/lead': '商机跟踪',
+  '/bid/signup': '报名准备',
+  '/bid/prepare': '投标准备',
+  '/bid/opening': '开标准备',
+  '/bid/archive': '归档任务',
   '/revenue': '收入管理',
   '/cost': '成本管理',
   '/budget': '预算管理',
@@ -113,6 +127,16 @@ const titleMap = {
 
 const pageTitle = computed(() => titleMap[route.path] || '数智运营看板')
 
+// 打开登录时清空表单并锁定背景滚动
+watch(showLogin, (v) => {
+  if (v) {
+    loginForm.value = { username: '', password: '' }
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = ''
+  }
+})
+
 function handleLogin() {
   if (!loginForm.value.username || !loginForm.value.password) {
     ElMessage.warning('请输入用户名和密码')
@@ -121,7 +145,6 @@ function handleLogin() {
   const ok = userStore.login(loginForm.value.username, loginForm.value.password)
   if (ok) {
     showLogin.value = false
-    loginForm.value = { username: '', password: '' }
     ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
     logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
     userStore.resumePending()
@@ -264,117 +287,285 @@ async function handleSync() {
   animation: spin 1s linear infinite;
 }
 
-// ===== 登录弹窗：牛马晨会卡 =====
-:global(.login-dialog) {
-  border-radius: var(--radius-lg);
+// ===== 登录：旗舰分屏（方案 B）=====
+.login-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.b-wrap {
+  position: relative;
+  width: 860px;
+  max-width: 94%;
+  height: 420px;
+  border-radius: 20px;
   overflow: hidden;
+  display: flex;
+  box-shadow: 0 30px 70px -16px rgba(10, 25, 60, 0.5);
+}
 
-  .el-dialog__header {
-    padding: 0;
+.b-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(15, 42, 102, 0.18);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--motion-fast) var(--ease-standard);
+
+  svg {
+    width: 16px;
+    height: 16px;
   }
 
-  .el-dialog__body {
-    padding: 0;
-  }
-
-  .el-dialog__footer {
-    padding: 0;
+  &:hover {
+    background: rgba(15, 42, 102, 0.32);
   }
 }
 
-.login-banner {
+// 左：品牌叙事区
+.b-left {
+  flex: 1.25;
   position: relative;
-  padding: 30px 24px 24px;
-  background: linear-gradient(135deg, #1d59d9 0%, #2f6feb 55%, #5b8ef0 100%);
   color: #fff;
-  text-align: center;
+  padding: 40px 38px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 120% at 85% -10%, rgba(79, 138, 242, 0.5) 0%, transparent 50%),
+    radial-gradient(70% 90% at -10% 110%, rgba(24, 52, 120, 0.7) 0%, transparent 55%),
+    linear-gradient(160deg, #0b1c45 0%, #123a8f 55%, #1d59d9 100%);
 
-  .banner-ribbon {
-    width: 44px;
-    height: 44px;
-    margin: 0 auto 10px;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -60px;
+    top: -60px;
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(91, 142, 240, 0.4) 0%, transparent 65%);
+  }
+}
+
+.b-brandline {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  letter-spacing: 4px;
+  opacity: 0.9;
+
+  .logo {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-md);
-    background: color-mix(in oklch, #ffffff 18%, transparent);
-    border: 1px solid color-mix(in oklch, #ffffff 32%, transparent);
-    backdrop-filter: blur(4px);
-
-    svg {
-      width: 24px;
-      height: 24px;
-      color: #fff;
-    }
-  }
-
-  .banner-brand {
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 4px;
-    opacity: 0.85;
-    margin-bottom: 6px;
-  }
-
-  .banner-hello {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-shadow: 0 2px 8px color-mix(in oklch, #000 24%, transparent);
-  }
-
-  .banner-sub {
-    margin-top: 6px;
-    font-size: 12px;
-    opacity: 0.82;
-    letter-spacing: 1px;
-  }
-}
-
-.login-body {
-  padding: 22px 24px 4px;
-
-  :deep(.el-form-item__label) {
-    font-size: 12px;
-    color: var(--muted);
-  }
-}
-
-.login-footer {
-  display: flex;
-  gap: 10px;
-  padding: 4px 24px 6px;
-
-  .login-submit {
-    flex: 1;
+    font-weight: 800;
     font-size: 15px;
-    letter-spacing: 8px;
-    padding-left: 20px;
-
-    svg {
-      margin-right: -4px;
-    }
   }
 }
 
-.login-tip {
-  padding: 0 24px 14px;
+.b-hero {
+  position: relative;
+  z-index: 1;
+
+  .b-hello {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1.35;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .b-sub {
+    margin-top: 10px;
+    font-size: 13px;
+    opacity: 0.78;
+    letter-spacing: 1px;
+    line-height: 1.8;
+  }
+}
+
+.b-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 26px;
+
+  .v {
+    font-size: 19px;
+    font-weight: 800;
+    font-family: 'SF Mono', Consolas, monospace;
+  }
+
+  .l {
+    font-size: 11px;
+    opacity: 0.65;
+    margin-top: 2px;
+    letter-spacing: 1px;
+  }
+
+  .unit {
+    font-size: 11px;
+  }
+}
+
+// 右：登录表单区
+.b-right {
+  flex: 1;
+  background: #fff;
+  padding: 38px 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .b-tip {
+    font-size: 12px;
+    color: #9aa3af;
+    margin: 4px 0 22px;
+  }
+}
+
+.b-in {
+  width: 100%;
+  height: 44px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 11px;
+  padding: 0 13px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fafbfd;
+  outline: none;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+
+  &::placeholder {
+    color: #9aa3af;
+  }
+
+  &:focus {
+    border-color: #2f6feb;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(47, 111, 235, 0.12);
+  }
+}
+
+.b-btn {
+  width: 100%;
+  height: 44px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 11px;
+  background: #0f2a66;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  text-indent: 8px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #1d59d9;
+  }
+}
+
+.b-foot {
   text-align: center;
   font-size: 11px;
-  color: var(--muted);
+  color: #9aa3af;
+  margin-top: 16px;
   letter-spacing: 2px;
 }
 
-// 弹窗关闭按钮移入蓝色横幅区域
-:global(.login-dialog) {
-  .el-dialog__headerbtn {
-    top: 10px;
-    right: 12px;
-    z-index: 3;
+// 过渡动画
+.login-fade-enter-active {
+  transition: opacity 0.25s ease-out;
 
-    .el-dialog__close {
-      color: #fff;
-    }
+  .b-wrap {
+    animation: loginRise 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+.login-fade-leave-active {
+  transition: opacity 0.18s ease-in;
+}
+
+.login-fade-enter-from,
+.login-fade-leave-to {
+  opacity: 0;
+}
+
+@keyframes loginRise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// 小屏适配：分屏改上下堆叠
+@media (max-width: 720px) {
+  .b-wrap {
+    flex-direction: column;
+    height: auto;
+    max-height: 92vh;
+    overflow: auto;
+  }
+
+  .b-left {
+    padding: 28px 26px;
+    gap: 18px;
+  }
+
+  .b-hero .b-hello {
+    font-size: 24px;
+  }
+
+  .b-right {
+    padding: 26px 26px 30px;
   }
 }
 </style>

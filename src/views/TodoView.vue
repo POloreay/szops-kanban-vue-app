@@ -142,7 +142,7 @@
               </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" @click="closeForm">取消</button>
+              <button type="button" class="btn-cancel" @click="closeForm">取消</button>
               <button type="submit" class="btn-uni">{{ editingId ? '保存修改' : '创建待办' }}</button>
             </div>
           </form>
@@ -871,5 +871,19 @@ function onToggle(t) {
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6) var(--space-5);
+
+  // 取消按钮与主按钮同规格（形状/大小一致，仅配色为白底）
+  .btn-cancel {
+    height: 34px;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover { background: var(--bg-hover, #f5f7fa); }
+  }
 }
 </style>

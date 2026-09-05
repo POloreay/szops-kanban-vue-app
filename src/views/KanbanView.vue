@@ -118,8 +118,7 @@
               <tr>
                 <th style="width:50px">序号</th>
                 <th>项目名称</th>
-                <th v-for="c in activeCols" :key="c.key" :title="c.label">{{ c.label }}</th>
-                <th style="width:90px">看板阶段</th>
+                <th v-for="c in activeCols" :key="c.key" :title="c.label" :style="{ minWidth: colMinWidth(c) }">{{ c.label }}</th>
                 <th style="width:90px">操作</th>
               </tr>
             </thead>
@@ -129,12 +128,11 @@
                 <td class="cell-title" :title="titleFull(t)">
                   {{ projName(t) }}<span v-if="isMgName(t)" class="mg-flag">占位</span><span v-if="isClosed(t)" class="closed-flag">已关闭</span>
                 </td>
-                <td v-for="c in activeCols" :key="c.key" :class="cellClass(t, c)">
+                <td v-for="c in activeCols" :key="c.key" :class="cellClass(t, c)" :style="{ minWidth: colMinWidth(c) }">
                   <span v-if="c.fmt === 'rate'" :style="rateStyle(t, c)">{{ cellText(t, c) }}</span>
                   <span v-else-if="c.key === 'buildStatus'" class="g-pill" :class="badgePill(t)"><span class="dot" :style="{ background: badgeDot(t) }"></span>{{ cellText(t, c) }}</span>
                   <span v-else>{{ cellText(t, c) }}</span>
                 </td>
-                <td><span class="g-pill" :class="statusPill(t.status)"><span class="dot" :style="{ background: statusDot(t.status) }"></span>{{ STATUS_NAMES[t.status] }}</span></td>
                 <td>
                   <button v-if="canManage(t)" class="row-del" @click.stop="delOne(t)">删除</button>
                 </td>
@@ -158,7 +156,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { useTaskStore } from '../stores/taskStore'
 import { useLogStore } from '../stores/logStore'
 import { useUserStore } from '../stores/userStore'
-import { STATUS_NAMES, LIST_COLUMNS, LIST_COLUMNS_DEFAULT, LIST_COLUMNS_STORAGE_KEY, BUILD_STATUS_BADGE } from '../utils/constants'
+import { LIST_COLUMNS, LIST_COLUMNS_DEFAULT, LIST_COLUMNS_STORAGE_KEY, BUILD_STATUS_BADGE } from '../utils/constants'
 import { isArchivedTask, isClosedProject } from '../utils/business'
 import {
   activeTasks, matchYearMonth, contractAmountOf, fmtWan,
@@ -253,11 +251,11 @@ const kpis = computed(() => {
   ]
 })
 
-function statusPill(s) {
-  return { talk: '', proc: 'warn', impl: 'good' }[s] || ''
-}
-function statusDot(s) {
-  return { talk: 'var(--chart-orange)', proc: 'var(--warn)', impl: 'var(--good)' }[s] || 'var(--muted)'
+// 动态列最小宽度：保证项目经理三字名、主标签四字战新标识不换行
+function colMinWidth(c) {
+  if (c?.key === 'pmName') return '72px'
+  if (c?.key === 'mainTag') return '86px'
+  return ''
 }
 
 // 系统项目状态徽标（buildStatus）
@@ -518,7 +516,7 @@ function onAnalysisJump() {
 
 .cell-title {
   font-weight: 500;
-  min-width: 220px;
+  min-width: 215px;
   white-space: normal;
   word-break: break-all;
   line-height: 1.5;

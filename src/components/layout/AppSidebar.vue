@@ -8,7 +8,7 @@
       <template v-for="group in navGroups" :key="group.label">
         <span v-show="!collapsed" class="nav-group-label">{{ group.label }}</span>
         <template v-for="item in group.items" :key="item.path">
-          <!-- 带子导航的分组（项目管理） -->
+          <!-- 带子导航的分组（项目管理/投标管理） -->
           <div v-if="item.children" class="nav-item-group">
             <router-link
               :to="item.path"
@@ -23,14 +23,14 @@
             <button
               v-show="!collapsed"
               class="nav-toggle"
-              :class="{ open: groupOpen || isChildActive }"
+              :class="{ open: groupOpen[item.path] || activeGroup === item.path.slice(1) }"
               type="button"
-              :aria-expanded="groupOpen || isChildActive"
-              @click="groupOpen = !groupOpen"
+              :aria-expanded="groupOpen[item.path] || activeGroup === item.path.slice(1)"
+              @click="groupOpen[item.path] = !groupOpen[item.path]"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </button>
-            <div class="nav-sub" :class="{ open: (groupOpen || isChildActive) && !collapsed }">
+            <div class="nav-sub" :class="{ open: (groupOpen[item.path] || activeGroup === item.path.slice(1)) && !collapsed }">
               <router-link
                 v-for="child in item.children"
                 :key="child.path"
@@ -80,14 +80,19 @@ defineEmits(['toggle'])
 
 const route = useRoute()
 const userStore = useUserStore()
-const groupOpen = ref(false)
+// 分组展开状态：kanban / bid 各自独立
+const groupOpen = ref({ kanban: false, bid: false })
 
 const currentPath = computed(() => route.path)
 
-// 任一子路由激活时分组自动展开
-const isChildActive = computed(() => currentPath.value.startsWith('/kanban/'))
+// 任一子路由激活时对应分组自动展开
+const activeGroup = computed(() => {
+  if (currentPath.value.startsWith('/kanban/')) return 'kanban'
+  if (currentPath.value.startsWith('/bid/')) return 'bid'
+  return ''
+})
 watchEffect(() => {
-  if (isChildActive.value) groupOpen.value = true
+  if (activeGroup.value) groupOpen.value[activeGroup.value] = true
 })
 
 // SVG 图标渲染函数
@@ -143,7 +148,14 @@ const navGroups = computed(() => {
         {
           path: '/bid',
           label: '投标管理',
-          iconComp: iconBid
+          iconComp: iconBid,
+          children: [
+            { path: '/bid/lead', label: '商机跟踪' },
+            { path: '/bid/signup', label: '报名准备' },
+            { path: '/bid/prepare', label: '投标准备' },
+            { path: '/bid/opening', label: '开标准备' },
+            { path: '/bid/archive', label: '归档任务' }
+          ]
         },
         { path: '/revenue', label: '收入管理', iconComp: iconRevenue },
         { path: '/cost', label: '成本管理', iconComp: iconCost },

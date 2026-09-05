@@ -1,30 +1,6 @@
 <template>
   <div class="bid-view">
-    <!-- 二级标题 Tab：投标总览 + 五环节 -->
-    <div class="view-tabs">
-      <button class="view-tab" :class="{ active: tab === 'overview' }" type="button" @click="tab = 'overview'">投标总览</button>
-      <button
-        v-for="s in STAGE_TABS"
-        :key="s"
-        class="view-tab"
-        :class="{ active: tab === s }"
-        type="button"
-        @click="tab = s"
-      >
-        {{ BID_STAGES[s].name }}
-        <span class="tab-badge" v-if="stageCounts[s]">{{ stageCounts[s] }}</span>
-      </button>
-      <div class="tab-tools">
-        <select class="stage-select" v-model="ownerFilter">
-          <option value="">全部创建人</option>
-          <option v-for="o in bidStore.owners" :key="o" :value="o">{{ o }}</option>
-        </select>
-        <button v-if="userStore.currentUser" class="btn-del" @click="openNew">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
-          新建投标
-        </button>
-      </div>
-    </div>
+    <!-- 导航已由左侧边栏「投标管理」子菜单承担（/bid 总览、/bid/{stage} 环节页） -->
 
     <!-- 未登录引导 -->
     <div v-if="!userStore.currentUser" class="panel empty-guide">
@@ -41,7 +17,7 @@
           :key="s"
           class="ov-card"
           :class="s"
-          @click="tab = s"
+          @click="goTab(s)"
         >
           <div class="ov-card-name">{{ BID_STAGES[s].name }}</div>
           <div class="ov-card-count">{{ stageCounts[s] }}<span class="ov-unit">个</span></div>
@@ -60,6 +36,16 @@
           <div>
             <h3 class="panel-title">处置时限紧迫榜 · TOP5</h3>
             <div class="panel-subtitle">各环节按截止日期临近程度排序（已逾期置顶） · 不含归档 · 点击行查看详情</div>
+          </div>
+          <div class="stage-tools">
+            <select class="stage-select" v-model="ownerFilter">
+              <option value="">全部创建人</option>
+              <option v-for="o in bidStore.owners" :key="o" :value="o">{{ o }}</option>
+            </select>
+            <button v-if="userStore.currentUser" class="btn-del" @click="openNew">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+              新建投标
+            </button>
           </div>
         </div>
         <table class="ds-table" v-if="urgentList.length">
@@ -92,6 +78,14 @@
           </div>
           <div class="stage-tools">
             <span class="stage-count">合计 {{ fmtWan(stageAmount(tab)) }} 万元</span>
+            <select class="stage-select" v-model="ownerFilter">
+              <option value="">全部创建人</option>
+              <option v-for="o in bidStore.owners" :key="o" :value="o">{{ o }}</option>
+            </select>
+            <button v-if="userStore.currentUser" class="btn-del" @click="openNew">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+              新建投标
+            </button>
           </div>
         </div>
         <div class="stage-table-wrap">
@@ -189,7 +183,8 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useBidStore } from '../stores/bidStore'
 import { useLogStore } from '../stores/logStore'
@@ -202,23 +197,22 @@ import BidFormModal from '../components/kanban/BidFormModal.vue'
 const bidStore = useBidStore()
 const logStore = useLogStore()
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
 
 onMounted(() => bidStore.loadBids())
 
 const ownerFilter = ref('')
 
-// Tab：overview + 五环节（含归档，归档仅在 Tab 内显示）
-const STAGE_TABS = BID_STAGE_ORDER
+// Tab 由路由驱动（与项目管理子页一致）：/bid = 总览，/bid/{stage} = 环节页
 const ACTIVE_STAGES = ['lead', 'signup', 'prepare', 'opening']
-const BID_TAB_KEY = 'szops_bid_tab'
-const tab = ref('overview')
-try {
-  const saved = localStorage.getItem(BID_TAB_KEY)
-  if (saved && (saved === 'overview' || BID_STAGE_ORDER.includes(saved))) tab.value = saved
-} catch (e) { /* ignore */ }
-watch(tab, v => {
-  try { localStorage.setItem(BID_TAB_KEY, v) } catch (e) { /* ignore */ }
+const tab = computed(() => {
+  const m = route.path.match(/^\/bid\/(lead|signup|prepare|opening|archive)$/)
+  return m ? m[1] : 'overview'
 })
+function goTab(t) {
+  router.push(t === 'overview' ? '/bid' : `/bid/${t}`)
+}
 
 const lists = computed(() => {
   const r = {}
@@ -351,10 +345,10 @@ function onResult(b, sub) {
   ElMessage.success(`已按「${sub}」归档`)
 }
 
-// 归档恢复：回到准备开标
+// 归档恢复：回到开标准备
 function onRestore(b) {
   bidStore.moveBid(b.id, 'opening', '结果反馈')
-  ElMessage.success('已恢复到「准备开标」')
+  ElMessage.success('已恢复到「开标准备」')
 }
 
 // 删除（敏感，弹确认）
@@ -400,53 +394,6 @@ function fmtDateTime(s) {
   flex-direction: column;
   gap: var(--space-4);
   min-height: 100%;
-}
-
-// 二级标题 Tab（与 KanbanView view-tabs 同款）
-.view-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.view-tab {
-  font: inherit;
-  font-size: 13px;
-  padding: 7px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--muted);
-  cursor: pointer;
-  transition: all var(--motion-fast) var(--ease-standard);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover { color: var(--fg); border-color: color-mix(in oklch, var(--fg) 24%, transparent); }
-  &.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-on);
-    font-weight: 500;
-
-    .tab-badge { background: color-mix(in oklab, #fff 26%, transparent); color: var(--accent-on); }
-  }
-}
-.tab-badge {
-  font-family: var(--font-mono);
-  background: var(--bg);
-  color: var(--muted);
-  border-radius: var(--radius-pill);
-  padding: 0 6px;
-  font-size: 10px;
-  line-height: 16px;
-}
-.tab-tools {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 // 总览第一行：环节卡片

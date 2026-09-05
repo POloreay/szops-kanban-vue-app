@@ -24,14 +24,14 @@ export const TARGET_METRICS = [
 ]
 
 // 投标管理（独立数据域）：生命周期五环节
-// 流转：商机跟踪 → 报名准备 → 投标准备 → 准备开标 → 归档任务
+// 流转：商机跟踪 → 报名准备 → 投标准备 → 开标准备 → 归档任务
 // 报名失败/放弃投标 → 直接归档；开标后按结果中标/落标归档
 export const BID_STORAGE_KEY = 'szops_bids_v1'
 export const BID_STAGES = {
   lead:    { name: '商机跟踪', subs: ['采购意向', '采购需求', '采购预告', '商机录入'] },
   signup:  { name: '报名准备', subs: ['平台注册', '准备资料', '报名成功', '报名失败'] },
   prepare: { name: '投标准备', subs: ['标前评审', '标书编制', '参数核对', '报价核对'] },
-  opening: { name: '准备开标', subs: ['打印封标', '开标', '结果反馈'] },
+  opening: { name: '开标准备', subs: ['打印封标', '开标', '结果反馈'] },
   archive: { name: '归档任务', subs: ['中标归档', '落标归档', '放弃归档'] }
 }
 export const BID_STAGE_ORDER = ['lead', 'signup', 'prepare', 'opening', 'archive']
