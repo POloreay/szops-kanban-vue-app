@@ -23,6 +23,22 @@ export const TARGET_METRICS = [
   { key: 'budget', label: '可用预算', unit: '万元' }
 ]
 
+// 投标管理（独立数据域）：生命周期五环节
+// 流转：商机跟踪 → 报名准备 → 投标准备 → 准备开标 → 归档任务
+// 报名失败/放弃投标 → 直接归档；开标后按结果中标/落标归档
+export const BID_STORAGE_KEY = 'szops_bids_v1'
+export const BID_STAGES = {
+  lead:    { name: '商机跟踪', subs: ['采购意向', '采购需求', '采购预告', '商机录入'] },
+  signup:  { name: '报名准备', subs: ['平台注册', '准备资料', '报名成功', '报名失败'] },
+  prepare: { name: '投标准备', subs: ['标前评审', '标书编制', '参数核对', '报价核对'] },
+  opening: { name: '准备开标', subs: ['打印封标', '开标', '结果反馈'] },
+  archive: { name: '归档任务', subs: ['中标归档', '落标归档', '放弃归档'] }
+}
+export const BID_STAGE_ORDER = ['lead', 'signup', 'prepare', 'opening', 'archive']
+export const BID_STAGE_NAMES = Object.fromEntries(BID_STAGE_ORDER.map(k => [k, BID_STAGES[k].name]))
+// 环节正向流转映射（opening 之后进入归档，由开标结果决定子状态）
+export const BID_NEXT = { lead: 'signup', signup: 'prepare', prepare: 'opening' }
+
 // 实施环节双通道子状态
 export const IMPL_SUBS_PATH1 = ['项目交付', '项目初验', '项目终验', '初验不通过', '终验不通过']
 export const IMPL_SUBS_PATH2 = ['财务开票', '财务回款', '财务列收']
@@ -44,7 +60,7 @@ export const STATUS_KEYS = {
 }
 export const PRIORITY_NAMES = { high: '高', medium: '中', low: '低' }
 export const PRIORITY_KEYS = { '高': 'high', '中': 'medium', '低': 'low' }
-export const STATUS_ORDER = ['talk', 'bid', 'proc', 'impl']
+export const STATUS_ORDER = ['talk', 'proc', 'impl']
 export const STATUS_COLORS = { talk: '#6366f1', bid: '#f59e0b', proc: '#3b82f6', impl: '#ef4444' }
 export const WARN_DAYS = 3
 export const ARCHIVE_SUBS = ['落标归档', '归档结束', '流标', '项目终止']
@@ -72,6 +88,27 @@ export function stageByBuildStatus(bs) {
   if (bs === '在建') return 'impl'
   return '' // 未知/空值由调用方回退旧规则
 }
+
+// 项目管理手动新建：XLS 提炼字段（快速录入，不设必填校验）
+export const XLS_QUICK_FIELDS = [
+  { key: 'projectName', label: '项目名称', type: 'text' },
+  { key: 'projectId', label: '项目编号', type: 'text' },
+  { key: 'projectType', label: '项目类型', type: 'text' },
+  { key: 'projectNature', label: '项目性质', type: 'text' },
+  { key: 'mainTag', label: '主标签（战新）', type: 'text' },
+  { key: 'clientName', label: '客户名称', type: 'text' },
+  { key: 'pmName', label: '项目经理名称', type: 'text' },
+  { key: 'buildStatus', label: '项目状态', type: 'select', options: BUILD_STATUS_LIST },
+  { key: 'createdDate', label: '创建日期', type: 'date' },
+  { key: 'planStartDate', label: '计划开始时间', type: 'date' },
+  { key: 'planEndDate', label: '计划完成时间', type: 'date' },
+  { key: 'contractAmount', label: '合同金额(不含税)', type: 'number' },
+  { key: 'planRevenueTax', label: '计划收入(含税)', type: 'number' },
+  { key: 'planCost', label: '计划成本', type: 'number' },
+  { key: 'actualCost', label: '实际成本', type: 'number' },
+  { key: 'accInvoice', label: '累计开票(含税)', type: 'number' },
+  { key: 'accCollection', label: '累计收款(含税)', type: 'number' }
+]
 // 项目总览列表：可配置列（默认显示14个字段；固定列「序号/项目名称/状态/操作」不在此配置范围）
 // fmt: text 纯文本 | money 元→万元格式化 | pill 优先级标签 | date 日期 | pct 百分比 | rate 比率列（带颜色阈值）
 export const LIST_COLUMNS = [

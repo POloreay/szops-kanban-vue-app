@@ -3,7 +3,7 @@
     <!-- 空数据引导 -->
     <div v-if="!active.length" class="panel empty-guide">
       <h3>暂无项目数据</h3>
-      <p>当前还没有任何项目数据。点击右上角「新建项目」，从 Excel 批量导入真实数据后，此处将展示完整决策视图。</p>
+      <p>当前还没有任何项目数据。在「项目管理」或各阶段页点击「新建项目」，从 Excel 批量导入真实数据后，此处将展示完整决策视图。</p>
     </div>
 
     <template v-else>
@@ -239,8 +239,7 @@ const scopeActive = computed(() => selectedProjectIds.value.length
   ? filteredActive.value.filter(t => selectedProjectIds.value.includes(t.id))
   : filteredActive.value)
 
-const bidWon = computed(() => scopeActive.value.filter(t => t.status === 'bid' && t.subStatus === '成功中标').length
-  + scopeActive.value.filter(t => t.status === 'proc' || t.status === 'impl').length)
+const bidWon = computed(() => scopeActive.value.filter(t => t.status === 'proc' || t.status === 'impl').length)
 const bidLost = computed(() => scopeActive.value.filter(t => t.subStatus === '落标归档' || t.subStatus === '流标').length)
 
 const totalContractYuan = computed(() => totalContract(scopeActive.value))
@@ -249,13 +248,12 @@ const totalCollectionYuan = computed(() => totalCollection(scopeActive.value))
 // KPI
 const kpis = computed(() => {
   const talk = scopeActive.value.filter(t => t.status === 'talk').length
-  const bid = scopeActive.value.filter(t => t.status === 'bid').length
   const proc = scopeActive.value.filter(t => t.status === 'proc').length
   const impl = scopeActive.value.filter(t => t.status === 'impl').length
   const overdue = overdueRank(scopeActive.value).length
   const rate = totalContractYuan.value > 0 ? totalCollectionYuan.value / totalContractYuan.value : 0
   return [
-    { label: '在执行项目', value: scopeActive.value.length, sub: `前期 ${talk} · 投标 ${bid} · 采购 ${proc} · 实施 ${impl}` },
+    { label: '在执行项目', value: scopeActive.value.length, sub: `前期 ${talk} · 采购 ${proc} · 实施 ${impl}` },
     { label: '合同总额（万元）', value: totalContractYuan.value ? fmtWan(totalContractYuan.value, 0) : '—', sub: '含税口径' },
     { label: '累计回款率', value: totalContractYuan.value ? (rate * 100).toFixed(1) + '%' : '—', sub: totalContractYuan.value ? `回款 ${fmtWan(totalCollectionYuan.value, 0)} / 合同 ${fmtWan(totalContractYuan.value, 0)}` : '暂无合同数据' },
     { label: '逾期风险项目', value: overdue, sub: overdue ? `待决策 ${scopeActive.value.filter(t => t.needDecision).length} 个 · 最长逾期 ${Math.max(...overdueRank(scopeActive.value).map(r => r.days))} 天` : `待决策 ${scopeActive.value.filter(t => t.needDecision).length} 个` }
@@ -265,11 +263,10 @@ const kpis = computed(() => {
 // 商机漏斗：各阶段当前任务数；条宽=阶段数/最大阶段数，百分比=阶段数/总数（均 ≤100%）；窄条时文字外置
 const funnel = computed(() => {
   const talk = scopeActive.value.filter(t => t.status === 'talk').length
-  const bid = scopeActive.value.filter(t => t.status === 'bid').length
   const proc = scopeActive.value.filter(t => t.status === 'proc').length
   const impl = scopeActive.value.filter(t => t.status === 'impl').length
-  const total = talk + bid + proc + impl
-  const max = Math.max(talk, bid, proc, impl)
+  const total = talk + proc + impl
+  const max = Math.max(talk, proc, impl)
   const pct = v => total ? Math.round(v / total * 100) + '%' : '—'
   const wPct = v => (max ? Math.max(v / max * 100, 8) : 8)
   const mk = (label, v, cls) => {
@@ -278,7 +275,6 @@ const funnel = computed(() => {
   }
   return [
     mk('前期环节', talk, ''),
-    mk('投标环节', bid, 's2'),
     mk('采购环节', proc, 's3'),
     mk('实施环节', impl, 's4')
   ]

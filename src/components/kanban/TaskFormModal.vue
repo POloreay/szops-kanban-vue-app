@@ -54,7 +54,6 @@
                         <td>
                           <select class="form-select import-stage-select" v-model="r.stage" @click.stop>
                             <option value="talk">前期环节</option>
-                            <option value="bid">投标环节</option>
                             <option value="proc">采购环节</option>
                             <option value="impl">实施环节</option>
                           </select>
@@ -74,11 +73,48 @@
               </template>
             </div>
 
-            <div v-if="!props.editing" class="import-divider"><span>或手动录入</span></div>
+            <div v-if="!props.editing" class="import-divider"><span>或手动录入（XLS 提炼字段，无必填）</span></div>
             <div v-if="props.editing" class="edit-notice">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
               编辑模式可修改项目全部字段（含财务明细），保存后同步到各看板
             </div>
+            <!-- 手动新建：XLS 提炼字段（无必填校验） -->
+            <template v-if="!props.editing">
+              <div class="form-grid-2">
+                <div v-for="f in XLS_QUICK_FIELDS" :key="f.key" class="form-row">
+                  <label>{{ f.label }}</label>
+                  <select v-if="f.type === 'select'" class="form-select" v-model="form.quickInfo[f.key]">
+                    <option value=""></option>
+                    <option v-for="opt in f.options" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                  <input v-else-if="f.type === 'date'" class="form-input" type="date" v-model="form.quickInfo[f.key]" />
+                  <input v-else :class="f.type === 'number' ? 'form-input num-input' : 'form-input'" :type="f.type === 'number' ? 'number' : 'text'" v-model="form.quickInfo[f.key]" :placeholder="f.label" />
+                </div>
+              </div>
+              <div class="form-row">
+                <label>备注描述</label>
+                <textarea class="form-input" v-model="form.desc" rows="2" placeholder="选填：项目背景、交付要求等"></textarea>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-row"><label>创建人</label><input class="form-input" v-model.trim="form.owner" placeholder="如：李泉" /></div>
+                <div class="form-row"><label>优先级</label>
+                  <select class="form-select" v-model="form.priority">
+                    <option value="高">高</option><option value="中">中</option><option value="低">低</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-row"><label>看板阶段</label>
+                  <select class="form-select" v-model="form.status">
+                    <option>前期环节</option><option>采购环节</option><option>实施环节</option>
+                  </select>
+                </div>
+                <div class="form-row"><label>截止日期</label><input class="form-input" v-model="form.deadline" type="date" /></div>
+              </div>
+            </template>
+
+            <!-- 编辑模式：全字段 -->
+            <template v-if="props.editing">
             <div class="form-row">
               <label>项目名称 <span class="req">*</span></label>
               <input class="form-input" v-model.trim="form.title" placeholder="如：算力服务器集成项目" />
@@ -102,7 +138,7 @@
             <div class="form-grid-2">
               <div class="form-row"><label>状态</label>
                 <select class="form-select" v-model="form.status">
-                  <option>前期环节</option><option>投标环节</option><option>采购环节</option><option>实施环节</option>
+                  <option>前期环节</option><option>采购环节</option><option>实施环节</option>
                 </select>
               </div>
               <div class="form-row"><label>子状态</label><input class="form-input" v-model.trim="form.subStatus" placeholder="如：标前评审" /></div>
@@ -115,6 +151,7 @@
               </div>
               <div class="form-row"><label>项目代理服务费(元)</label><input class="form-input" v-model="form.agencyFee" type="number" min="0" step="0.01" placeholder="选填" /></div>
             </div>
+            </template>
 
             <!-- 实施环节双通道子状态（编辑模式） -->
             <div v-if="props.editing" class="form-grid-2">
@@ -155,7 +192,7 @@
 import { ref, reactive, nextTick, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as XLSX from 'xlsx'
-import { XLS_FIELDS, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, stageByBuildStatus } from '../../utils/constants'
+import { XLS_FIELDS, XLS_QUICK_FIELDS, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, stageByBuildStatus, STATUS_KEYS } from '../../utils/constants'
 import { useTaskStore } from '../../stores/taskStore'
 import { useLogStore } from '../../stores/logStore'
 import { useUserStore } from '../../stores/userStore'
@@ -172,10 +209,18 @@ const fileInput = ref(null)
 
 const form = reactive({
   title: '', desc: '', owner: '', contact: '', deadline: '',
-  priority: '中', status: '投标环节', subStatus: '', needDecision: '否', agencyFee: '',
+  priority: '中', status: '前期环节', subStatus: '', needDecision: '否', agencyFee: '',
   implSub1: '', implSub2: '',
-  projectInfo: {}
+  projectInfo: {},
+  quickInfo: {}
 })
+
+// XLS 提炼字段默认值（全部空）
+function emptyQuickInfo() {
+  const o = {}
+  XLS_QUICK_FIELDS.forEach(f => { o[f.key] = '' })
+  return o
+}
 
 // 导入状态
 const importState = ref('idle') // idle | preview
@@ -286,7 +331,7 @@ function resetImport() {
 function autoFillFormFromImport(rows) {
   if (!rows || !rows.length) return
   const first = rows[0]
-  if (first.title) form.title = first.title
+  if (first.title) form.quickInfo.projectName = first.title
   if (first.owner) form.owner = first.owner
   if (first.contact) form.contact = first.contact
   form.deadline = first.deadline || form.deadline || todayStr()
@@ -306,24 +351,24 @@ function onConfirmImport() {
 }
 
 function onSubmit() {
-  if (!form.title || !form.owner || !form.deadline) {
-    ElMessage.error('请补全必填项：项目名称、创建人、截止日期')
-    return
-  }
-  const payload = {
-    title: form.title,
-    desc: form.desc,
-    owner: form.owner,
-    contact: form.contact,
-    deadline: form.deadline,
-    priority: form.priority,
-    status: form.status,
-    subStatus: form.subStatus,
-    needDecision: form.needDecision === '是',
-    agencyFee: form.agencyFee === '' ? '' : Number(form.agencyFee)
-  }
   if (props.editing) {
-    // 编辑模式：放开全部字段
+    // 编辑模式：必填校验 + 全字段
+    if (!form.title || !form.owner || !form.deadline) {
+      ElMessage.error('请补全必填项：项目名称、创建人、截止日期')
+      return
+    }
+    const payload = {
+      title: form.title,
+      desc: form.desc,
+      owner: form.owner,
+      contact: form.contact,
+      deadline: form.deadline,
+      priority: form.priority,
+      status: form.status,
+      subStatus: form.subStatus,
+      needDecision: form.needDecision === '是',
+      agencyFee: form.agencyFee === '' ? '' : Number(form.agencyFee)
+    }
     payload.implSub1 = form.implSub1
     payload.implSub2 = form.implSub2
     payload.projectInfo = {}
@@ -335,8 +380,35 @@ function onSubmit() {
     logStore.addLog('编辑', `修改项目「${form.title}」`, userStore.currentUser?.username || '系统')
     ElMessage.success('项目修改已保存')
   } else {
+    // 手动新建：XLS 提炼字段，无必填校验
+    const quick = { ...form.quickInfo }
+    // 项目名称：quickInfo.projectName → title
+    const title = String(quick.projectName || '').trim() || '未命名项目'
+    // 金额字段转数字
+    const numFields = ['contractAmount', 'planRevenueTax', 'planCost', 'actualCost', 'accInvoice', 'accCollection']
+    numFields.forEach(k => {
+      if (quick[k] !== '' && quick[k] != null) {
+        const n = Number(String(quick[k]).replace(/[,&\s]/g, ''))
+        quick[k] = isNaN(n) ? quick[k] : n
+      }
+    })
+    // 阶段：按项目状态自动分配（与导入一致），否则用表单选择
+    let statusKey = STATUS_KEYS[form.status] || 'talk'
+    const bs = String(quick.buildStatus || '').trim()
+    const mapped = stageByBuildStatus(bs)
+    if (mapped) statusKey = mapped
+    // 若用户手动选了阶段且与自动分配不同，以自动分配优先（与导入预览一致）；否则保持手动选择
+    const payload = {
+      title,
+      desc: form.desc,
+      owner: form.owner || (userStore.currentUser?.username || ''),
+      deadline: form.deadline || todayStr(),
+      priority: { '高': 'high', '中': 'medium', '低': 'low' }[form.priority] || 'medium',
+      status: statusKey,
+      projectInfo: quick
+    }
     taskStore.addTask(payload)
-    logStore.addLog('新建', `创建项目「${form.title}」`, userStore.currentUser?.username || '系统')
+    logStore.addLog('新建', `创建项目「${title}」`, userStore.currentUser?.username || '系统')
     ElMessage.success('项目创建成功')
   }
   close()
@@ -351,9 +423,10 @@ function close() {
   const saved = keep ? { title: form.title, owner: form.owner, contact: form.contact, deadline: form.deadline } : null
   Object.assign(form, {
     title: '', desc: '', owner: '', contact: '', deadline: '',
-    priority: '中', status: '投标环节', subStatus: '', needDecision: '否', agencyFee: '',
+    priority: '中', status: '前期环节', subStatus: '', needDecision: '否', agencyFee: '',
     implSub1: '', implSub2: '',
-    projectInfo: {}
+    projectInfo: {},
+    quickInfo: emptyQuickInfo()
   })
   if (saved) Object.assign(form, saved)
   visible.value = false
@@ -386,7 +459,11 @@ function fillForm(t) {
 
 watch(() => props.modelValue, async (v) => {
   if (v) {
-    if (props.editing) fillForm(props.editing)
+    if (props.editing) {
+      fillForm(props.editing)
+    } else {
+      form.quickInfo = emptyQuickInfo()
+    }
     visible.value = true
     await nextTick()
   }

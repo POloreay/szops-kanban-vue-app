@@ -3,7 +3,7 @@
     <!-- 空数据引导 -->
     <div v-if="!active.length && !showClosed" class="panel empty-guide">
       <h3>暂无项目数据</h3>
-      <p>点击右上角「新建项目」从 Excel 批量导入，或手动录入第一条项目。</p>
+      <p>点击工具栏「新建项目」从 Excel 批量导入，或手动录入第一条项目。</p>
     </div>
 
     <template v-else>
@@ -24,6 +24,10 @@
             <div class="panel-subtitle">点击项目行查看详情 · 可按年度/月度筛选 · 列可自定义</div>
           </div>
           <div class="stage-tools">
+            <button v-if="userStore.currentUser" class="btn-new" @click="showNewTask = true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+              新建项目
+            </button>
             <select class="stage-select" v-model="year">
               <option value="all">全部年度</option>
               <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
@@ -94,6 +98,9 @@
         </div>
       </div>
     </template>
+
+    <!-- 新建项目弹窗（模块内入口） -->
+    <TaskFormModal v-model="showNewTask" />
   </div>
 </template>
 
@@ -110,11 +117,13 @@ import {
   collectionRateOf, revDoneRateOf, costExecRateOf, marginGapOf, metricsOf
 } from '../utils/finance'
 import { fmtMoney } from '../utils/business'
+import TaskFormModal from '../components/kanban/TaskFormModal.vue'
 
 const taskStore = useTaskStore()
 const logStore = useLogStore()
 const userStore = useUserStore()
 const openDrawer = inject('openTaskDrawer', () => {})
+const showNewTask = ref(false)
 
 // 权限：创建人本人或管理员可管理
 const isAdmin = computed(() => userStore.isAdmin)
@@ -159,7 +168,6 @@ const filtered = computed(() => active.value.filter(t => matchYearMonth(t, year.
 const kpis = computed(() => {
   const list = filtered.value
   const talk = list.filter(t => t.status === 'talk').length
-  const bid = list.filter(t => t.status === 'bid').length
   const proc = list.filter(t => t.status === 'proc').length
   const impl = list.filter(t => t.status === 'impl').length
   const high = list.filter(t => t.priority === 'high').length
@@ -175,7 +183,7 @@ const kpis = computed(() => {
   const actualCost = m.reduce((a, x) => a + x.actualCost, 0)
   const closedCount = list.filter(t => isClosedProject(t)).length
   return [
-    { label: '项目总数', value: list.length, sub: `前期 ${talk} · 投标 ${bid} · 采购 ${proc} · 实施 ${impl}${showClosed.value ? ` · 含已关闭 ${closedCount}` : ''}` },
+    { label: '项目总数', value: list.length, sub: `前期 ${talk} · 采购 ${proc} · 实施 ${impl}${showClosed.value ? ` · 含已关闭 ${closedCount}` : ''}` },
     { label: '合同总额（万元）', value: contract ? fmtWan(contract, 0) : '—', sub: '不含税口径' },
     { label: '回款率', value: inv > 0 ? (col / inv * 100).toFixed(1) + '%' : '—', sub: inv > 0 ? `收款 ${fmtWan(col, 0)} / 开票 ${fmtWan(inv, 0)} 万` : '暂无开票数据' },
     { label: '收入完成率', value: planRev > 0 ? (ledgerRev / planRev * 100).toFixed(1) + '%' : '—', sub: planRev > 0 ? `列账 ${fmtWan(ledgerRev, 0)} / 计划 ${fmtWan(planRev, 0)} 万` : '暂无计划收入' },
@@ -185,10 +193,10 @@ const kpis = computed(() => {
 })
 
 function statusPill(s) {
-  return { talk: '', bid: 'accent', proc: 'warn', impl: 'good' }[s] || ''
+  return { talk: '', proc: 'warn', impl: 'good' }[s] || ''
 }
 function statusDot(s) {
-  return { talk: 'var(--chart-orange)', bid: 'var(--accent)', proc: 'var(--warn)', impl: 'var(--good)' }[s] || 'var(--muted)'
+  return { talk: 'var(--chart-orange)', proc: 'var(--warn)', impl: 'var(--good)' }[s] || 'var(--muted)'
 }
 
 // 系统项目状态徽标（buildStatus）
@@ -391,6 +399,27 @@ function cellClass(t, c) {
   background: color-mix(in oklch, var(--chart-orange) 12%, transparent);
   color: var(--chart-orange);
   border: 1px solid color-mix(in oklch, var(--chart-orange) 28%, transparent);
+}
+
+// 新建项目按钮（主色，与全站新建入口同款）
+.btn-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-on);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard);
+
+  svg { flex-shrink: 0; }
+  &:hover { background: var(--primary-hover); }
 }
 
 // 已关闭开关

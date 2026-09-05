@@ -1,9 +1,12 @@
 <template>
   <div class="stage-view">
+    <!-- 新建项目弹窗（模块内入口） -->
+    <TaskFormModal v-model="showNewTask" />
+
     <!-- 空数据引导 -->
     <div v-if="!stageTasks.length" class="panel empty-guide">
       <h3>暂无{{ title }}项目</h3>
-      <p>当前没有处于「{{ title }}」的项目。点击右上角「新建项目」导入数据。</p>
+      <p>当前没有处于「{{ title }}」的项目。可点击工具栏「新建项目」录入数据。</p>
     </div>
 
     <template v-else>
@@ -24,6 +27,10 @@
             <div class="panel-subtitle">{{ subtitle }}</div>
           </div>
           <div class="stage-tools">
+            <button v-if="userStore.currentUser && !selectMode" class="btn-del" @click="showNewTask = true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+              新建项目
+            </button>
             <template v-if="!selectMode">
               <button v-if="canManageAny" class="btn-del" @click.stop="enterSelectMode">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -104,8 +111,9 @@ import { useTaskStore } from '../stores/taskStore'
 import { useLogStore } from '../stores/logStore'
 import { useUserStore } from '../stores/userStore'
 import { PRIORITY_NAMES } from '../utils/constants'
-import { isArchivedTask, isOverdue, isWarn, getDaysLeft, fmtDate } from '../utils/business'
+import { isArchivedTask, isClosedProject, isAnyArchived, isOverdue, isWarn, getDaysLeft, fmtDate } from '../utils/business'
 import { activeTasks, matchYearMonth, contractAmountOf, fmtWan } from '../utils/finance'
+import TaskFormModal from '../components/kanban/TaskFormModal.vue'
 
 const props = defineProps({
   status: { type: String, required: true },
@@ -122,6 +130,7 @@ const taskStore = useTaskStore()
 const logStore = useLogStore()
 const userStore = useUserStore()
 const openDrawer = inject('openTaskDrawer', () => {})
+const showNewTask = ref(false)
 
 // 权限：创建人本人或管理员可管理
 const isAdmin = computed(() => userStore.isAdmin)
@@ -191,7 +200,13 @@ async function batchDelete() {
 const year = ref('all')
 const month = ref('all')
 
-const stageTasks = computed(() => activeTasks(taskStore.tasks).filter(t => t.status === props.status))
+// 数据源：closed 视图展示已关闭项目（业务/财务关闭等终态），其余按阶段过滨（活跃项目）
+const stageTasks = computed(() => {
+  if (props.status === 'closed') {
+    return taskStore.tasks.filter(t => isClosedProject(t))
+  }
+  return activeTasks(taskStore.tasks).filter(t => t.status === props.status)
+})
 const filtered = computed(() => stageTasks.value.filter(t => matchYearMonth(t, year.value, month.value)))
 
 const years = computed(() => {
@@ -214,14 +229,15 @@ const kpis = computed(() => {
   ]
 })
 
-const statusPillClass = computed(() => ({ talk: '', bid: 'accent', proc: 'warn', impl: 'good' }[props.status] || ''))
-const statusDotColor = computed(() => ({ talk: 'var(--chart-orange)', bid: 'var(--accent)', proc: 'var(--warn)', impl: 'var(--good)' }[props.status] || 'var(--muted)'))
+const statusPillClass = computed(() => ({ talk: '', closed: 'warn', proc: 'warn', impl: 'good' }[props.status] || ''))
+const statusDotColor = computed(() => ({ talk: 'var(--chart-orange)', closed: 'var(--chart-orange)', proc: 'var(--warn)', impl: 'var(--good)' }[props.status] || 'var(--muted)'))
 
 function subStatusText(t) {
+  if (props.status === 'closed') return (t.projectInfo && t.projectInfo.buildStatus) || '已关闭'
   if (t.status === 'impl') return t.implSub1 || '项目交付'
   return t.subStatus || STATUS_FALLBACK[t.status] || '进行中'
 }
-const STATUS_FALLBACK = { talk: '前期沟通', bid: '投标中', proc: '采购中', impl: '实施中' }
+const STATUS_FALLBACK = { talk: '前期沟通', proc: '采购中', impl: '实施中' }
 
 function hasAmount(t) { return contractAmountOf(t) > 0 }
 function amountText(t) {

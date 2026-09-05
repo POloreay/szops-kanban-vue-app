@@ -724,4 +724,42 @@ const targetCards = computed(() => {
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6) var(--space-5);
 }
+
+// ===== 按钮样式（对齐 AppHeader 规格与新建项目按钮） =====
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-standard);
+  border: none;
+  white-space: nowrap;
+  height: 34px;
+
+  svg { flex-shrink: 0; }
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-on);
+
+  &:hover { background: var(--primary-hover); }
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+
+  &:hover { border-color: color-mix(in oklch, var(--fg) 20%, transparent); }
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 </style>

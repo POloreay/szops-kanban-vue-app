@@ -51,7 +51,7 @@ const statusName = computed(() => STATUS_NAMES[props.status])
 const statusColor = computed(() => STATUS_COLORS[props.status])
 
 const pillClass = computed(() => {
-  const map = { talk: '', bid: 'accent', proc: 'warn', impl: 'good' }
+  const map = { talk: '', proc: 'warn', impl: 'good' }
   return map[props.status] || ''
 })
 

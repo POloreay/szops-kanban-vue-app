@@ -12,17 +12,11 @@
         </svg>
         <input type="search" v-model="searchQuery" placeholder="搜索项目、任务…" aria-label="全局搜索" />
       </div>
-      <button class="btn btn-secondary" @click="handleSync" :disabled="syncing">
+      <button v-if="userStore.currentUser" class="btn btn-secondary" @click="handleSync" :disabled="syncing">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" :class="{ 'spin-anim': syncing }">
           <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.4-2.6L3 21M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.4 2.6L21 3M3 21v-5h5M21 3v5h-5" />
         </svg>
         {{ syncing ? '同步中…' : '云同步' }}
-      </button>
-      <button v-if="userStore.currentUser" class="btn btn-primary" @click="$emit('new-task')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        新建项目
       </button>
       <button v-else class="btn btn-primary" @click="showLogin = true">登录</button>
       <template v-if="userStore.currentUser">
@@ -55,7 +49,7 @@ import { useUserStore } from '../../stores/userStore'
 import { useLogStore } from '../../stores/logStore'
 import { useTaskStore } from '../../stores/taskStore'
 
-defineEmits(['toggle', 'new-task'])
+defineEmits(['toggle'])
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -71,9 +65,10 @@ const titleMap = {
   '/dashboard': '仪表盘总览',
   '/kanban': '项目管理',
   '/kanban/pre': '前期阶段',
-  '/kanban/bid': '投标阶段',
   '/kanban/procurement': '采购阶段',
   '/kanban/implementation': '实施阶段',
+  '/kanban/closed': '已关闭项目',
+  '/bid': '投标管理',
   '/revenue': '收入管理',
   '/cost': '成本管理',
   '/budget': '预算管理',

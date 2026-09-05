@@ -98,6 +98,10 @@ const iconDashboard = () => [
   h('rect', { x: 3, y: 16, width: 7, height: 5, rx: 1 })
 ]
 const iconProjects = () => h('path', { d: 'M3 7h6l2 2h10v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7z' })
+const iconBid = () => [
+  h('path', { d: 'M19 5 5 19' }),
+  h('path', { d: 'M14.5 4.5a3.5 3.5 0 0 1 5 5L7 22H2v-5z' })
+]
 const iconRevenue = () => h('path', { d: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' })
 const iconCost = () => [
   h('rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }),
@@ -131,10 +135,15 @@ const navGroups = computed(() => {
           iconComp: iconProjects,
           children: [
             { path: '/kanban/pre', label: '前期阶段' },
-            { path: '/kanban/bid', label: '投标阶段' },
             { path: '/kanban/procurement', label: '采购阶段' },
-            { path: '/kanban/implementation', label: '实施阶段' }
+            { path: '/kanban/implementation', label: '实施阶段' },
+            { path: '/kanban/closed', label: '已关闭项目' }
           ]
+        },
+        {
+          path: '/bid',
+          label: '投标管理',
+          iconComp: iconBid
         },
         { path: '/revenue', label: '收入管理', iconComp: iconRevenue },
         { path: '/cost', label: '成本管理', iconComp: iconCost },

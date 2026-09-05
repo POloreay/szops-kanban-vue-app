@@ -130,7 +130,7 @@ function onEdit() {
   if (props.task && openEditModal) openEditModal(props.task)
 }
 
-const STATUS_IDX = { talk: 0, bid: 1, proc: 2, impl: 3 }
+const STATUS_IDX = { talk: 0, proc: 1, impl: 2 }
 
 // 标题：优先取 XLS「项目名称」字段，回退任务标题
 const drawerTitle = computed(() => {

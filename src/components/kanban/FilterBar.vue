@@ -44,7 +44,6 @@
       style="width: 120px"
     >
       <el-option label="前期环节" value="talk" />
-      <el-option label="投标环节" value="bid" />
       <el-option label="采购环节" value="proc" />
       <el-option label="实施环节" value="impl" />
     </el-select>

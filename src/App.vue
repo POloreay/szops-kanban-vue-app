@@ -2,7 +2,7 @@
   <div class="app-layout">
     <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
     <div class="app-main">
-      <AppHeader @toggle="collapsed = !collapsed" @new-task="showNewTask = true" />
+      <AppHeader @toggle="collapsed = !collapsed" />
       <main class="app-content">
         <router-view />
       </main>
@@ -20,6 +20,7 @@ import AppHeader from './components/layout/AppHeader.vue'
 import TaskFormModal from './components/kanban/TaskFormModal.vue'
 import TaskDrawer from './components/kanban/TaskDrawer.vue'
 import { useTaskStore } from './stores/taskStore'
+import { useBidStore } from './stores/bidStore'
 import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useLogStore } from './stores/logStore'
@@ -62,6 +63,7 @@ watch(showNewTask, (v) => {
 })
 
 const taskStore = useTaskStore()
+const bidStore = useBidStore()
 const userStore = useUserStore()
 const settingsStore = useSettingsStore()
 const logStore = useLogStore()
@@ -73,13 +75,18 @@ onMounted(async () => {
   userStore.getUsers()
 
   taskStore.loadTasks()
+  bidStore.loadBids()
   settingsStore.loadSettings()
   logStore.getLogs()
   todoStore.loadTodos()
   targetStore.loadTargets()
 
+  // 一次性迁移：老看板 status='bid' 任务 → 投标管理归档列（标记存 localStorage，只执行一次）
+  migrateBidTasks()
+
   await Promise.all([
     taskStore.cloudLoadTasks(),
+    bidStore.cloudLoadBids(),
     settingsStore.cloudLoadSettings(),
     userStore.cloudLoadUsers(),
     logStore.cloudLoadLogs(),
@@ -87,10 +94,47 @@ onMounted(async () => {
     targetStore.cloudLoadTargets()
   ])
 
+  // 云端拉取后重跑迁移（防止云端还有未迁移的 bid 任务）
+  migrateBidTasks()
+
   setInterval(async () => {
     await taskStore.cloudLoadTasks()
   }, 60000)
 })
+
+// 老 bid 任务迁移：落标归档/归档结束 → 归档列；其余活跃投标任务也一并迁入商机跟踪
+const BID_MIGRATED_KEY = 'szops_bid_migrated_v1'
+function migrateBidTasks() {
+  try {
+    const oldBids = taskStore.tasks.filter(t => t.status === 'bid')
+    if (!oldBids.length) return
+    // 已在投标库里的老任务 id（避免重复迁移）
+    const existing = new Set(bidStore.bids.map(b => b.id))
+    const toAdd = oldBids
+      .filter(t => !existing.has(t.id))
+      .map(t => ({
+        id: t.id,
+        title: (t.projectInfo && t.projectInfo.projectName) || t.title || '',
+        desc: t.desc || '',
+        owner: t.owner || '',
+        contact: t.contact || '',
+        priority: t.priority || 'medium',
+        deadline: t.deadline || '',
+        stage: 'archive',
+        subStatus: t.subStatus === '落标归档' || t.subStatus === '归档结束' ? '落标归档' : '中标归档',
+        agencyFee: t.agencyFee || '',
+        createdAt: t.createdAt || new Date().toISOString(),
+        migratedFrom: 'task'
+      }))
+    if (!toAdd.length) return
+    bidStore.bids.push(...toAdd)
+    bidStore.saveBids()
+    localStorage.setItem(BID_MIGRATED_KEY, '1')
+    logStore.addLog('迁移', `迁移 ${toAdd.length} 条老投标任务到投标管理归档列`, userStore.currentUser?.username || '系统')
+  } catch (e) {
+    console.warn('migrateBidTasks error:', e)
+  }
+}
 </script>
 
 <style scoped lang="scss">
