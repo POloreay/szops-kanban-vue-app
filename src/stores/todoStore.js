@@ -2,7 +2,7 @@
 
 import { defineStore } from 'pinia'
 import { TODO_KEY } from '../utils/constants'
-import { cloudFetch } from '../api/supabase'
+import { cloudFetch, cloudSave } from '../api/supabase'
 import { uid } from '../utils/business'
 
 export const useTodoStore = defineStore('todo', {
@@ -41,9 +41,11 @@ export const useTodoStore = defineStore('todo', {
 
     saveTodos() {
       localStorage.setItem(TODO_KEY, JSON.stringify(this.todos))
-      // 同步写入 settings.todosData（由 settingsStore 处理云端写入）
-      // 这里发出事件让 settingsStore 感知
-      window.dispatchEvent(new CustomEvent('todos-updated', { detail: this.todos }))
+      // 云端：拉取 settings 后合并写回 todosData，避免覆盖其他字段（与 bidStore/targetStore 同机制）
+      cloudFetch('settings').then(s => {
+        const merged = { ...(s || {}), todosData: this.todos }
+        cloudSave('settings', merged)
+      })
     },
 
     addTodo(data) {

@@ -135,17 +135,6 @@ const navGroups = computed(() => {
       items: [
         { path: '/dashboard', label: '仪表盘总览', iconComp: iconDashboard },
         {
-          path: '/kanban',
-          label: '项目管理',
-          iconComp: iconProjects,
-          children: [
-            { path: '/kanban/pre', label: '前期阶段' },
-            { path: '/kanban/procurement', label: '采购阶段' },
-            { path: '/kanban/implementation', label: '实施阶段' },
-            { path: '/kanban/closed', label: '已关闭项目' }
-          ]
-        },
-        {
           path: '/bid',
           label: '投标管理',
           iconComp: iconBid,
@@ -155,6 +144,17 @@ const navGroups = computed(() => {
             { path: '/bid/prepare', label: '投标准备' },
             { path: '/bid/opening', label: '开标准备' },
             { path: '/bid/archive', label: '归档任务' }
+          ]
+        },
+        {
+          path: '/kanban',
+          label: '项目管理',
+          iconComp: iconProjects,
+          children: [
+            { path: '/kanban/pre', label: '前期阶段' },
+            { path: '/kanban/procurement', label: '采购阶段' },
+            { path: '/kanban/implementation', label: '实施阶段' },
+            { path: '/kanban/closed', label: '已关闭项目' }
           ]
         },
         { path: '/revenue', label: '收入管理', iconComp: iconRevenue },
@@ -183,7 +183,7 @@ const navGroups = computed(() => {
 
 <style scoped lang="scss">
 .sidebar {
-  width: 240px;
+  width: 220px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;

@@ -1,12 +1,16 @@
 <template>
   <div class="stage-view">
-    <!-- 新建项目弹窗（模块内入口） -->
-    <TaskFormModal v-model="showNewTask" />
+    <!-- 新建项目弹窗（模块内入口，默认落入当前环节） -->
+    <TaskFormModal v-model="showNewTask" :default-status="status === 'closed' ? 'talk' : status" />
 
     <!-- 空数据引导 -->
     <div v-if="!stageTasks.length" class="panel empty-guide">
       <h3>暂无{{ title }}项目</h3>
-      <p>当前没有处于「{{ title }}」的项目。可点击工具栏「新建项目」录入数据。</p>
+      <p>当前没有处于「{{ title }}」的项目。</p>
+      <button v-if="userStore.currentUser && status !== 'closed'" class="btn-del" @click="showNewTask = true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+        新建项目
+      </button>
     </div>
 
     <template v-else>
@@ -27,7 +31,7 @@
             <div class="panel-subtitle">{{ subtitle }}</div>
           </div>
           <div class="stage-tools">
-            <button v-if="userStore.currentUser && !selectMode" class="btn-del" @click="showNewTask = true">
+            <button v-if="userStore.currentUser && !selectMode && status !== 'closed'" class="btn-del" @click="showNewTask = true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
               新建项目
             </button>
@@ -65,7 +69,7 @@
               v-for="(t, i) in filtered"
               :key="t.id"
               class="proj-card"
-              :class="[pClass(t.priority), { 'is-overdue': deadlineClass(t) === 'overdue', 'is-selected': selectMode && selectedIds.has(t.id), 'is-disabled': selectMode && !canManage(t) }]"
+              :class="[pClass(t.priority), { 'is-overdue': deadlineClass(t) === 'overdue', 'is-selected': selectMode && selectedIds.has(t.id), 'is-disabled': selectMode && !canManage(t), 'no-deadline': !showDeadline }]"
               :title="cardTitle(t)"
               @click="selectMode ? toggleSelect(t) : openDrawer(t)"
             >
@@ -88,7 +92,7 @@
               <div class="proj-card-owner">
                 <span class="avatar">{{ (t.owner || '?').slice(0, 1) }}</span>{{ t.owner || '—' }}
               </div>
-              <div class="proj-card-deadline" :class="deadlineClass(t)" :title="planEndFull(t)">
+              <div v-if="showDeadline" class="proj-card-deadline" :class="deadlineClass(t)" :title="planEndFull(t)">
                 <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
                 {{ deadlineText(t) }}
               </div>
@@ -229,6 +233,8 @@ const kpis = computed(() => {
 
 const statusPillClass = computed(() => ({ talk: '', closed: 'warn', proc: 'warn', impl: 'good' }[props.status] || ''))
 const statusDotColor = computed(() => ({ talk: 'var(--chart-orange)', closed: 'var(--chart-orange)', proc: 'var(--warn)', impl: 'var(--good)' }[props.status] || 'var(--muted)'))
+// 剩余处置期限：仅前期/采购阶段显示（需求：实施/已关闭不展示）
+const showDeadline = computed(() => props.status === 'talk' || props.status === 'proc')
 
 function subStatusText(t) {
   if (props.status === 'closed') return (t.projectInfo && t.projectInfo.buildStatus) || '已关闭'
@@ -313,6 +319,12 @@ function deadlineText(t) {
     .proj-card-tags { grid-column: 2; grid-row: 3; justify-content: flex-start; }
     .proj-card-owner { grid-column: 2; grid-row: 4; }
     .proj-card-amount { grid-column: 2; grid-row: 5; justify-content: flex-start; }
+
+    &.no-deadline {
+      .proj-card-amount { grid-row: 2; }
+      .proj-card-tags { grid-row: 3; }
+      .proj-card-owner { grid-row: 4; }
+    }
   }
 }
 
@@ -322,6 +334,26 @@ function deadlineText(t) {
 
   h3 { font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-2); color: var(--fg); }
   p { font-size: 13px; color: var(--muted); max-width: 420px; margin: 0 auto; }
+
+  .btn-del {
+    margin-top: var(--space-4);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    padding: 0 14px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: var(--accent-on);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--motion-fast) var(--ease-standard);
+
+    svg { flex-shrink: 0; }
+    &:hover { background: var(--primary-hover); }
+  }
 }
 
 .proj-card {
@@ -342,6 +374,10 @@ function deadlineText(t) {
     border-color: color-mix(in oklch, var(--accent) 40%, transparent);
     box-shadow: var(--elev-raised);
     transform: translateY(-1px);
+  }
+
+  &.no-deadline {
+    grid-template-columns: 36px minmax(0, 1.6fr) auto 100px 96px;
   }
 
   &::before {

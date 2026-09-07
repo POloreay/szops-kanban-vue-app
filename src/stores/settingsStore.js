@@ -44,10 +44,15 @@ export const useSettingsStore = defineStore('settings', {
     },
 
     // 持久化设置 + 同步 todosData + 写云端
+    // 云端采用合并写：未显式传入 todosData 时保留云端最新值，避免内存旧数据覆盖其他 store 刚写入的数据
     persistSettings(todosData) {
       if (todosData) this.settings.todosData = todosData
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings))
-      cloudSave('settings', this.settings)
+      cloudFetch('settings').then(s => {
+        const merged = { ...(s || {}), ...this.settings }
+        if (!todosData && s && Array.isArray(s.todosData)) merged.todosData = s.todosData
+        cloudSave('settings', merged)
+      })
     },
 
     // 保存设置

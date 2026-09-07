@@ -31,28 +31,40 @@
       </div>
 
       <div class="panels-row">
-        <!-- 商机漏斗 -->
-        <div class="panel">
+        <!-- 商机漏斗：投标管理 + 项目管理子状态汇总 -->
+        <div class="panel funnel-panel">
           <div class="panel-header">
             <div>
               <h3 class="panel-title">商机漏斗</h3>
-              <div class="panel-subtitle">仅统计 active 任务 · 归档单独备注</div>
+              <div class="panel-subtitle">投标管理各环节 · 项目管理各子状态汇总</div>
             </div>
             <span class="g-pill accent"><span class="dot"></span>实时</span>
           </div>
-          <div class="funnel">
-            <div class="funnel-row" v-for="(row, i) in funnel" :key="i">
-              <div class="funnel-label">{{ row.label }}</div>
-              <div class="funnel-cell">
-                <div class="funnel-bar" :class="row.cls" :style="{ width: row.width }">{{ row.inside ? row.text : '' }}</div>
-                <span v-if="!row.inside" class="funnel-out-text">{{ row.text }}</span>
+          <!-- 投标管理漏斗 -->
+          <div class="funnel-section">
+            <div class="funnel-section-title">投标管理（{{ bidTotalCount }}）</div>
+            <div class="funnel">
+              <div class="funnel-row" v-for="(row, i) in bidFunnel" :key="'bid-' + i">
+                <div class="funnel-label">{{ row.label }}</div>
+                <div class="funnel-cell">
+                  <div class="funnel-bar" :class="row.cls" :style="{ width: row.width }">{{ row.inside ? row.text : '' }}</div>
+                  <span v-if="!row.inside" class="funnel-out-text">{{ row.text }}</span>
+                </div>
               </div>
-              <span class="funnel-conv">{{ row.conv }}</span>
             </div>
           </div>
-          <div class="funnel-foot">
-            <span>中标 {{ bidWon }} · 落标 {{ bidLost }}</span>
-            <span>归档 {{ archivedCount }}（未计入）</span>
+          <!-- 项目管理子状态漏斗 -->
+          <div class="funnel-section" v-for="(g, gi) in projFunnel" :key="'proj-' + gi">
+            <div class="funnel-section-title">{{ g.title }}</div>
+            <div class="funnel">
+              <div class="funnel-row" v-for="(row, ri) in g.rows" :key="ri">
+                <div class="funnel-label">{{ row.label }}</div>
+                <div class="funnel-cell">
+                  <div class="funnel-bar" :class="row.cls" :style="{ width: row.width }">{{ row.inside ? row.text : '' }}</div>
+                  <span v-if="!row.inside" class="funnel-out-text">{{ row.text }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -204,8 +216,8 @@
 <script setup>
 import { computed, ref, inject } from 'vue'
 import { useTaskStore } from '../stores/taskStore'
-import { BIZ_COLORS } from '../utils/constants'
-import { isArchivedTask } from '../utils/business'
+import { useBidStore } from '../stores/bidStore'
+import { BIZ_COLORS, BID_STAGES, BID_STAGE_ORDER, STATUS_MAP } from '../utils/constants'
 import ProjectMultiSelect from '../components/kanban/ProjectMultiSelect.vue'
 import {
   activeTasks, totalContract, totalCollection, collectionTopN, barTopN,
@@ -213,10 +225,10 @@ import {
 } from '../utils/finance'
 
 const taskStore = useTaskStore()
+const bidStore = useBidStore()
 const openDrawer = inject('openTaskDrawer', () => {})
 
 const active = computed(() => activeTasks(taskStore.tasks))
-const archivedCount = computed(() => taskStore.tasks.filter(t => isArchivedTask(t)).length)
 
 // 年度/月度筛选（项目创建日期口径）
 const year = ref(String(new Date().getFullYear()))
@@ -244,9 +256,6 @@ const scopeActive = computed(() => selectedProjectIds.value.length
   ? filteredActive.value.filter(t => selectedProjectIds.value.includes(t.id))
   : filteredActive.value)
 
-const bidWon = computed(() => scopeActive.value.filter(t => t.status === 'proc' || t.status === 'impl').length)
-const bidLost = computed(() => scopeActive.value.filter(t => t.subStatus === '落标归档' || t.subStatus === '流标').length)
-
 const totalContractYuan = computed(() => totalContract(scopeActive.value))
 const totalCollectionYuan = computed(() => totalCollection(scopeActive.value))
 
@@ -266,25 +275,51 @@ const kpis = computed(() => {
   ]
 })
 
-// 商机漏斗：各阶段当前任务数；条宽=阶段数/最大阶段数，百分比=阶段数/总数（均 ≤100%）；窄条时文字外置
-const funnel = computed(() => {
-  const talk = scopeActive.value.filter(t => t.status === 'talk').length
-  const proc = scopeActive.value.filter(t => t.status === 'proc').length
-  const impl = scopeActive.value.filter(t => t.status === 'impl').length
-  const total = talk + proc + impl
-  const max = Math.max(talk, proc, impl)
-  const pct = v => total ? Math.round(v / total * 100) + '%' : '—'
-  const wPct = v => (max ? Math.max(v / max * 100, 8) : 8)
-  const mk = (label, v, cls) => {
-    const w = wPct(v)
-    return { label, text: `${v} 个任务`, width: w + '%', conv: pct(v), cls, inside: w >= 24 }
-  }
-  return [
-    mk('前期环节', talk, ''),
-    mk('采购环节', proc, 's3'),
-    mk('实施环节', impl, 's4')
-  ]
+// 商机漏斗：投标管理各环节 + 项目管理各子状态汇总统计
+const bidFunnel = computed(() => {
+  const maxCount = Math.max(...BID_STAGE_ORDER.map(s => bidStore.byStage(s).length), 1)
+  return BID_STAGE_ORDER.map((stage, i) => {
+    const count = bidStore.byStage(stage).length
+    const w = Math.max(count / maxCount * 100, 8)
+    return {
+      label: BID_STAGES[stage].name,
+      count,
+      text: `${count} 个`,
+      width: w + '%',
+      cls: `s${i + 1}`,
+      inside: w >= 24
+    }
+  })
 })
+
+const projFunnel = computed(() => {
+  const tasks = scopeActive.value
+  const groups = []
+  function buildGroup(title, statusKey, subs, cls) {
+    const stageTasks = tasks.filter(t => t.status === statusKey)
+    const counts = subs.map(s => stageTasks.filter(t => t.subStatus === s).length)
+    const unclassified = stageTasks.filter(t => !subs.includes(t.subStatus)).length
+    const allCounts = [...counts, unclassified]
+    const max = Math.max(...allCounts, 1)
+    const rows = subs.map((s, i) => ({
+      label: s, count: counts[i],
+      text: `${counts[i]}`,
+      width: Math.max(counts[i] / max * 100, 8) + '%',
+      cls, inside: counts[i] / max * 100 >= 24
+    }))
+    if (unclassified > 0) {
+      rows.push({ label: '未分类', count: unclassified, text: `${unclassified}`, width: Math.max(unclassified / max * 100, 8) + '%', cls, inside: unclassified / max * 100 >= 24 })
+    }
+    return { title, rows }
+  }
+  groups.push(buildGroup('前期环节', 'talk', STATUS_MAP.talk.subs, ''))
+  groups.push(buildGroup('采购环节', 'proc', STATUS_MAP.proc.subs, 's3'))
+  const implCount = tasks.filter(t => t.status === 'impl').length
+  groups.push({ title: '实施环节', rows: [{ label: '实施中', count: implCount, text: `${implCount}`, width: '100%', cls: 's4', inside: true }] })
+  return groups
+})
+
+const bidTotalCount = computed(() => bidStore.bids.length)
 
 // 战新业务分布环图（按主标签 mainTag 分组，空值归「一般项目」；配色沿用 BIZ_COLORS）
 const donut = computed(() => {
@@ -438,6 +473,25 @@ const overdueList = computed(() => overdueRank(scopeActive.value).slice(0, 6))
   > span { color: var(--muted); }
   strong { color: var(--fg); font-family: var(--font-mono); margin-left: 4px; }
   .accent-text strong { color: var(--accent); }
+}
+
+.funnel-panel {
+  grid-row: span 2;
+}
+
+.funnel-section {
+  margin-bottom: var(--space-4);
+
+  &:last-child { margin-bottom: 0; }
+}
+
+.funnel-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: var(--space-2);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
 }
 
 .funnel-foot {

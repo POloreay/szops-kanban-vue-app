@@ -78,8 +78,29 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
               编辑模式可修改项目全部字段（含财务明细），保存后同步到各看板
             </div>
-            <!-- 手动新建：XLS 提炼字段（无必填校验） -->
+            <!-- 手动新建：阶段 + 子状态选择（无必填校验） -->
             <template v-if="!props.editing">
+              <div class="form-grid-2">
+                <div class="form-row">
+                  <label>项目阶段</label>
+                  <select class="form-select" v-model="form.status">
+                    <option value="talk">前期环节</option>
+                    <option value="proc">采购环节</option>
+                    <option value="impl">实施环节</option>
+                  </select>
+                </div>
+                <div class="form-row" v-if="form.status !== 'impl'">
+                  <label>子状态</label>
+                  <select class="form-select" v-model="form.subStatus">
+                    <option value="">未指定</option>
+                    <option v-for="s in subStatusOptions" :key="s" :value="s">{{ s }}</option>
+                  </select>
+                </div>
+              </div>
+              <div v-if="isCustom" class="form-row">
+                <label>自定义子状态名称</label>
+                <input class="form-input" v-model.trim="form.customSubStatus" placeholder="请输入自定义子状态名称" />
+              </div>
               <div class="form-grid-2">
                 <div v-for="f in XLS_QUICK_FIELDS" :key="f.key" class="form-row">
                   <label>{{ f.label }}</label>
@@ -109,6 +130,27 @@
             </div>
             <div class="form-grid-2">
               <div class="form-row"><label>创建人 <span class="req">*</span></label><input class="form-input" v-model.trim="form.owner" placeholder="如：李泉" /></div>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-row">
+                <label>项目阶段</label>
+                <select class="form-select" v-model="form.status">
+                  <option value="talk">前期环节</option>
+                  <option value="proc">采购环节</option>
+                  <option value="impl">实施环节</option>
+                </select>
+              </div>
+              <div class="form-row" v-if="form.status !== 'impl'">
+                <label>子状态</label>
+                <select class="form-select" v-model="form.subStatus">
+                  <option value="">未指定</option>
+                  <option v-for="s in subStatusOptions" :key="s" :value="s">{{ s }}</option>
+                </select>
+              </div>
+            </div>
+            <div v-if="isCustom" class="form-row">
+              <label>自定义子状态名称</label>
+              <input class="form-input" v-model.trim="form.customSubStatus" placeholder="请输入自定义子状态名称" />
             </div>
             </template>
 
@@ -150,12 +192,16 @@
 <script setup>
 import { ref, reactive, nextTick, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { XLS_FIELDS, XLS_QUICK_FIELDS, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, stageByBuildStatus } from '../../utils/constants'
+import { XLS_FIELDS, XLS_QUICK_FIELDS, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, STATUS_MAP, stageByBuildStatus } from '../../utils/constants'
 import { useTaskStore } from '../../stores/taskStore'
 import { useLogStore } from '../../stores/logStore'
 import { useUserStore } from '../../stores/userStore'
 
-const props = defineProps({ modelValue: Boolean, editing: { type: Object, default: null } })
+const props = defineProps({
+  modelValue: Boolean,
+  editing: { type: Object, default: null },
+  defaultStatus: { type: String, default: '' }
+})
 const emit = defineEmits(['update:modelValue'])
 
 const taskStore = useTaskStore()
@@ -167,6 +213,7 @@ const fileInput = ref(null)
 
 const form = reactive({
   title: '', desc: '', owner: '',
+  status: 'talk', subStatus: '', customSubStatus: '',
   implSub1: '', implSub2: '',
   projectInfo: {},
   quickInfo: {}
@@ -183,6 +230,23 @@ function emptyQuickInfo() {
 const importState = ref('idle') // idle | preview
 const importRows = ref([]) // [{ checked, title, desc, owner, contact, priority, deadline, subStatus, needDecision, agencyFee, contractAmount, stage }]
 const checkedCount = computed(() => importRows.value.filter(r => r.checked).length)
+// 当前阶段可选子状态
+const curSubs = computed(() => STATUS_MAP[form.status]?.subs || [])
+// 旧数据兼容：若已有 subStatus 不在新列表中，追加为额外选项
+const subStatusOptions = computed(() => {
+  const subs = [...curSubs.value]
+  if (form.subStatus && !subs.includes(form.subStatus)) subs.push(form.subStatus)
+  return subs
+})
+const isCustom = computed(() => form.subStatus === '其他')
+// 阶段变化时重置子状态
+watch(() => form.status, (s) => {
+  const subs = STATUS_MAP[s]?.subs || []
+  if (!subs.includes(form.subStatus)) {
+    form.subStatus = subs[0] || ''
+    form.customSubStatus = ''
+  }
+})
 
 // 从一行 Excel 数据中尽力识别字段：先按标准中文列名取，取不到则模糊匹配
 function pickField(row, label) {
@@ -312,6 +376,8 @@ function onSubmit() {
       title: form.title,
       desc: form.desc,
       owner: form.owner,
+      status: form.status,
+      subStatus: form.status === 'impl' ? '' : (form.subStatus === '其他' && form.customSubStatus ? form.customSubStatus : form.subStatus),
       implSub1: form.implSub1,
       implSub2: form.implSub2
     }
@@ -336,17 +402,23 @@ function onSubmit() {
         quick[k] = isNaN(n) ? quick[k] : n
       }
     })
-    // 阶段：按项目状态自动分配（与导入一致），否则默认前期
-    let statusKey = 'talk'
+    // 阶段：优先使用用户选择的阶段，若选了项目状态则自动映射覆盖
+    let statusKey = form.status || 'talk'
     const bs = String(quick.buildStatus || '').trim()
     const mapped = stageByBuildStatus(bs)
     if (mapped) statusKey = mapped
+    // 子状态：前期「其他」用自定义文本
+    let subStatus = form.subStatus
+    if (subStatus === '其他' && form.customSubStatus) {
+      subStatus = form.customSubStatus
+    }
     const payload = {
       title,
       desc: form.desc,
       owner: form.owner || (userStore.currentUser?.username || ''),
       priority: 'medium',
       status: statusKey,
+      subStatus: statusKey === 'impl' ? '' : subStatus,
       projectInfo: quick
     }
     taskStore.addTask(payload)
@@ -365,6 +437,7 @@ function close() {
   const saved = keep ? { title: form.title, owner: form.owner } : null
   Object.assign(form, {
     title: '', desc: '', owner: '',
+    status: props.defaultStatus || 'talk', subStatus: '', customSubStatus: '',
     implSub1: '', implSub2: '',
     projectInfo: {},
     quickInfo: emptyQuickInfo()
@@ -380,6 +453,9 @@ function fillForm(t) {
     title: (info.projectName || t.title) || '',
     desc: t.desc || '',
     owner: t.owner || '',
+    status: t.status || 'talk',
+    subStatus: t.subStatus || '',
+    customSubStatus: '',
     implSub1: t.implSub1 || '',
     implSub2: t.implSub2 || '',
     projectInfo: {}
@@ -397,6 +473,9 @@ watch(() => props.modelValue, async (v) => {
       fillForm(props.editing)
     } else {
       form.quickInfo = emptyQuickInfo()
+      form.status = props.defaultStatus || 'talk'
+      form.subStatus = ''
+      form.customSubStatus = ''
     }
     visible.value = true
     await nextTick()

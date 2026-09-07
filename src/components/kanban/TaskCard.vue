@@ -100,11 +100,21 @@ const implSub1Style = computed(() => {
 
 const subStatusStyle = computed(() => {
   const subStatusColorMap = {
-    '采购意向': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
+    // 前期环节（新子状态体系）
+    '收入合同起草': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
+    '收入合同签订': 'color: var(--good); background: color-mix(in oklch, var(--good) 8%, transparent); border-color: color-mix(in oklch, var(--good) 24%, transparent);',
+    '翔云项目立项': 'color: var(--warn); background: color-mix(in oklch, var(--warn) 10%, transparent); border-color: color-mix(in oklch, var(--warn) 28%, transparent);',
+    '其他': 'color: var(--muted); background: var(--bg); border-color: var(--border);',
+    // 采购环节（新子状态体系）
     '采购需求': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
-    '采购预告': 'color: var(--good); background: color-mix(in oklch, var(--good) 8%, transparent); border-color: color-mix(in oklch, var(--good) 24%, transparent);',
-    '商机录入': 'color: var(--warn); background: color-mix(in oklch, var(--warn) 10%, transparent); border-color: color-mix(in oklch, var(--warn) 28%, transparent);',
-    '项目报名': 'color: var(--purple); background: color-mix(in oklch, var(--purple) 8%, transparent); border-color: color-mix(in oklch, var(--purple) 24%, transparent);',
+    '采购方案': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
+    '采购公告（公示）': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
+    '现场开标': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
+    '候选公示': 'color: var(--warn); background: color-mix(in oklch, var(--warn) 10%, transparent); border-color: color-mix(in oklch, var(--warn) 28%, transparent);',
+    '采购结果': 'color: var(--good); background: color-mix(in oklch, var(--good) 8%, transparent); border-color: color-mix(in oklch, var(--good) 24%, transparent);',
+    '结果公示': 'color: var(--good); background: color-mix(in oklch, var(--good) 8%, transparent); border-color: color-mix(in oklch, var(--good) 24%, transparent);',
+    '支出合同起草': 'color: var(--warn); background: color-mix(in oklch, var(--warn) 10%, transparent); border-color: color-mix(in oklch, var(--warn) 28%, transparent);',
+    '支出合同签订': 'color: var(--good); background: color-mix(in oklch, var(--good) 8%, transparent); border-color: color-mix(in oklch, var(--good) 24%, transparent);',
     '标前评审': 'color: var(--warn); background: color-mix(in oklch, var(--warn) 10%, transparent); border-color: color-mix(in oklch, var(--warn) 28%, transparent);',
     '标书编写': 'color: var(--warn); background: color-mix(in oklch, var(--warn) 10%, transparent); border-color: color-mix(in oklch, var(--warn) 28%, transparent);',
     '标书审核': 'color: var(--warn); background: color-mix(in oklch, var(--warn) 10%, transparent); border-color: color-mix(in oklch, var(--warn) 28%, transparent);',
@@ -114,11 +124,7 @@ const subStatusStyle = computed(() => {
     '落标归档': 'color: var(--bad); background: color-mix(in oklch, var(--bad) 8%, transparent); border-color: color-mix(in oklch, var(--bad) 24%, transparent);',
     '归档结束': 'color: var(--muted); background: var(--bg); border-color: var(--border);',
     '流标': 'color: var(--bad); background: color-mix(in oklch, var(--bad) 8%, transparent); border-color: color-mix(in oklch, var(--bad) 24%, transparent);',
-    '项目终止': 'color: var(--muted); background: var(--bg); border-color: var(--border);',
-    '采购方案': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
-    '现场开标': 'color: var(--info); background: color-mix(in oklch, var(--info) 8%, transparent); border-color: color-mix(in oklch, var(--info) 24%, transparent);',
-    '采购结果': 'color: var(--good); background: color-mix(in oklch, var(--good) 8%, transparent); border-color: color-mix(in oklch, var(--good) 24%, transparent);',
-    '支出合同签订': 'color: var(--good); background: color-mix(in oklch, var(--good) 8%, transparent); border-color: color-mix(in oklch, var(--good) 24%, transparent);'
+    '项目终止': 'color: var(--muted); background: var(--bg); border-color: var(--border);'
   }
   return subStatusColorMap[props.task.subStatus] || 'color: var(--muted); background: var(--bg); border-color: var(--border);'
 })
