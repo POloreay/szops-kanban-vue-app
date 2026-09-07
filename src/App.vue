@@ -91,7 +91,8 @@ onMounted(async () => {
   // 一次性迁移：老看板 status='bid' 任务 → 投标管理归档列（标记存 localStorage，只执行一次）
   migrateBidTasks()
 
-  await Promise.all([
+  // 云端数据后台静默拉取：不阻塞界面渲染（本地数据已先秒开显示）
+  Promise.all([
     taskStore.cloudLoadTasks(),
     bidStore.cloudLoadBids(),
     settingsStore.cloudLoadSettings(),
@@ -99,10 +100,10 @@ onMounted(async () => {
     logStore.cloudLoadLogs(),
     todoStore.cloudLoadTodos(),
     targetStore.cloudLoadTargets()
-  ])
-
-  // 云端拉取后重跑迁移（防止云端还有未迁移的 bid 任务）
-  migrateBidTasks()
+  ]).then(() => {
+    // 云端拉取后重跑迁移（防止云端还有未迁移的 bid 任务）
+    migrateBidTasks()
+  }).catch(e => console.warn('cloud load error:', e))
 
   setInterval(async () => {
     await taskStore.cloudLoadTasks()

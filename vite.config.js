@@ -9,6 +9,16 @@ export default defineConfig({
     open: true
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'element-plus': ['element-plus'],
+          'element-icons': ['@element-plus/icons-vue'],
+          'vue-vendor': ['vue', 'vue-router', 'pinia', 'pinia-plugin-persistedstate']
+        }
+      }
+    }
   }
 })

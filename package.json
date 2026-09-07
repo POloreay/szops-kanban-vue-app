@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
-    "echarts": "^6.1.0",
     "element-plus": "^2.14.5",
     "pinia": "^4.0.3",
     "pinia-plugin-persistedstate": "^4.7.1",

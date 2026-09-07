@@ -150,7 +150,6 @@
 <script setup>
 import { ref, reactive, nextTick, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import * as XLSX from 'xlsx'
 import { XLS_FIELDS, XLS_QUICK_FIELDS, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, stageByBuildStatus } from '../../utils/constants'
 import { useTaskStore } from '../../stores/taskStore'
 import { useLogStore } from '../../stores/logStore'
@@ -225,6 +224,8 @@ async function onFileChange(e) {
   const file = e.target.files && e.target.files[0]
   if (!file) return
   try {
+    // 动态加载 xlsx：只在导入 Excel 时才下载，减小首屏体积
+    const XLSX = await import('xlsx')
     const buf = await file.arrayBuffer()
     const wb = XLSX.read(buf, { type: 'array' })
     const ws = wb.Sheets[wb.SheetNames[0]]
