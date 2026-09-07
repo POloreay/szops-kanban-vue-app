@@ -41,7 +41,7 @@
             <span class="g-pill accent"><span class="dot"></span>实时</span>
           </div>
           <!-- 投标管理漏斗 -->
-          <div class="funnel-section" v-if="bidFunnel.length">
+          <div class="funnel-section">
             <div class="funnel-section-title">投标管理（{{ bidTotalCount }}）</div>
             <div class="funnel">
               <div class="funnel-row" v-for="(row, i) in bidFunnel" :key="'bid-' + i">
@@ -54,7 +54,7 @@
             </div>
           </div>
           <!-- 项目管理漏斗 -->
-          <div class="funnel-section" v-if="projFunnel.length">
+          <div class="funnel-section">
             <div class="funnel-section-title">项目管理（{{ projTotalCount }}）</div>
             <div class="funnel">
               <div class="funnel-row" v-for="(row, i) in projFunnel" :key="'proj-' + i">
@@ -275,7 +275,7 @@ const kpis = computed(() => {
   ]
 })
 
-// 商机漏斗：投标管理各环节 + 项目管理各阶段（仅展示有数据项）
+// 商机漏斗：投标管理5环节 + 项目管理4阶段（全部展示，含0数据项）
 const bidFunnel = computed(() => {
   const maxCount = Math.max(...BID_STAGE_ORDER.map(s => bidStore.byStage(s).length), 1)
   return BID_STAGE_ORDER.map((stage, i) => {
@@ -289,7 +289,7 @@ const bidFunnel = computed(() => {
       cls: `s${i + 1}`,
       inside: w >= 24
     }
-  }).filter(r => r.count > 0)
+  })
 })
 
 const projFunnel = computed(() => {
@@ -301,7 +301,7 @@ const projFunnel = computed(() => {
     { key: 'closed', label: '已关闭项目', cls: 's4' }
   ]
   const counts = stages.map(s => tasks.filter(t => t.status === s.key || (s.key === 'closed' && ['完工', '验收', '业务关闭', '财务关闭'].includes(t.subStatus))).length)
-  const max = Math.max(...counts.filter(c => c > 0), 1)
+  const max = Math.max(...counts, 1)
   return stages.map((s, i) => ({
     label: s.label,
     count: counts[i],
@@ -309,7 +309,7 @@ const projFunnel = computed(() => {
     width: Math.max(counts[i] / max * 100, 8) + '%',
     cls: s.cls,
     inside: counts[i] / max * 100 >= 24
-  })).filter(r => r.count > 0)
+  }))
 })
 
 const projTotalCount = computed(() => scopeActive.value.length)
