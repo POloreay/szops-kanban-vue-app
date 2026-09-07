@@ -31,17 +31,17 @@
       </div>
 
       <div class="panels-row">
-        <!-- 商机漏斗：投标管理 + 项目管理子状态汇总 -->
+        <!-- 商机漏斗：投标管理各环节 + 项目管理各阶段 -->
         <div class="panel funnel-panel">
           <div class="panel-header">
             <div>
               <h3 class="panel-title">商机漏斗</h3>
-              <div class="panel-subtitle">投标管理各环节 · 项目管理各子状态汇总</div>
+              <div class="panel-subtitle">投标管理各环节 · 项目管理各阶段</div>
             </div>
             <span class="g-pill accent"><span class="dot"></span>实时</span>
           </div>
           <!-- 投标管理漏斗 -->
-          <div class="funnel-section">
+          <div class="funnel-section" v-if="bidFunnel.length">
             <div class="funnel-section-title">投标管理（{{ bidTotalCount }}）</div>
             <div class="funnel">
               <div class="funnel-row" v-for="(row, i) in bidFunnel" :key="'bid-' + i">
@@ -53,11 +53,11 @@
               </div>
             </div>
           </div>
-          <!-- 项目管理子状态漏斗 -->
-          <div class="funnel-section" v-for="(g, gi) in projFunnel" :key="'proj-' + gi">
-            <div class="funnel-section-title">{{ g.title }}</div>
+          <!-- 项目管理漏斗 -->
+          <div class="funnel-section" v-if="projFunnel.length">
+            <div class="funnel-section-title">项目管理（{{ projTotalCount }}）</div>
             <div class="funnel">
-              <div class="funnel-row" v-for="(row, ri) in g.rows" :key="ri">
+              <div class="funnel-row" v-for="(row, i) in projFunnel" :key="'proj-' + i">
                 <div class="funnel-label">{{ row.label }}</div>
                 <div class="funnel-cell">
                   <div class="funnel-bar" :class="row.cls" :style="{ width: row.width }">{{ row.inside ? row.text : '' }}</div>
@@ -217,7 +217,7 @@
 import { computed, ref, inject } from 'vue'
 import { useTaskStore } from '../stores/taskStore'
 import { useBidStore } from '../stores/bidStore'
-import { BIZ_COLORS, BID_STAGES, BID_STAGE_ORDER, STATUS_MAP } from '../utils/constants'
+import { BIZ_COLORS, BID_STAGES, BID_STAGE_ORDER } from '../utils/constants'
 import ProjectMultiSelect from '../components/kanban/ProjectMultiSelect.vue'
 import {
   activeTasks, totalContract, totalCollection, collectionTopN, barTopN,
@@ -275,7 +275,7 @@ const kpis = computed(() => {
   ]
 })
 
-// 商机漏斗：投标管理各环节 + 项目管理各子状态汇总统计
+// 商机漏斗：投标管理各环节 + 项目管理各阶段（仅展示有数据项）
 const bidFunnel = computed(() => {
   const maxCount = Math.max(...BID_STAGE_ORDER.map(s => bidStore.byStage(s).length), 1)
   return BID_STAGE_ORDER.map((stage, i) => {
@@ -289,36 +289,30 @@ const bidFunnel = computed(() => {
       cls: `s${i + 1}`,
       inside: w >= 24
     }
-  })
+  }).filter(r => r.count > 0)
 })
 
 const projFunnel = computed(() => {
   const tasks = scopeActive.value
-  const groups = []
-  function buildGroup(title, statusKey, subs, cls) {
-    const stageTasks = tasks.filter(t => t.status === statusKey)
-    const counts = subs.map(s => stageTasks.filter(t => t.subStatus === s).length)
-    const unclassified = stageTasks.filter(t => !subs.includes(t.subStatus)).length
-    const allCounts = [...counts, unclassified]
-    const max = Math.max(...allCounts, 1)
-    const rows = subs.map((s, i) => ({
-      label: s, count: counts[i],
-      text: `${counts[i]}`,
-      width: Math.max(counts[i] / max * 100, 8) + '%',
-      cls, inside: counts[i] / max * 100 >= 24
-    }))
-    if (unclassified > 0) {
-      rows.push({ label: '未分类', count: unclassified, text: `${unclassified}`, width: Math.max(unclassified / max * 100, 8) + '%', cls, inside: unclassified / max * 100 >= 24 })
-    }
-    return { title, rows }
-  }
-  groups.push(buildGroup('前期环节', 'talk', STATUS_MAP.talk.subs, ''))
-  groups.push(buildGroup('采购环节', 'proc', STATUS_MAP.proc.subs, 's3'))
-  const implCount = tasks.filter(t => t.status === 'impl').length
-  groups.push({ title: '实施环节', rows: [{ label: '实施中', count: implCount, text: `${implCount}`, width: '100%', cls: 's4', inside: true }] })
-  return groups
+  const stages = [
+    { key: 'talk', label: '前期阶段', cls: 's1' },
+    { key: 'proc', label: '采购阶段', cls: 's2' },
+    { key: 'impl', label: '实施阶段', cls: 's3' },
+    { key: 'closed', label: '已关闭项目', cls: 's4' }
+  ]
+  const counts = stages.map(s => tasks.filter(t => t.status === s.key || (s.key === 'closed' && ['完工', '验收', '业务关闭', '财务关闭'].includes(t.subStatus))).length)
+  const max = Math.max(...counts.filter(c => c > 0), 1)
+  return stages.map((s, i) => ({
+    label: s.label,
+    count: counts[i],
+    text: `${counts[i]} 个`,
+    width: Math.max(counts[i] / max * 100, 8) + '%',
+    cls: s.cls,
+    inside: counts[i] / max * 100 >= 24
+  })).filter(r => r.count > 0)
 })
 
+const projTotalCount = computed(() => scopeActive.value.length)
 const bidTotalCount = computed(() => bidStore.bids.length)
 
 // 战新业务分布环图（按主标签 mainTag 分组，空值归「一般项目」；配色沿用 BIZ_COLORS）
