@@ -19,7 +19,10 @@ export function getAccessToken() {
     const raw = localStorage.getItem(AUTH_SESSION_KEY)
     if (raw) {
       const sess = JSON.parse(raw)
-      if (sess.access_token && Date.now() < (sess.expires_at || 0)) {
+      const exp = sess.expires_at || 0
+      // 兼容秒级/毫秒级时间戳
+      const expMs = exp < 1e12 ? exp * 1000 : exp
+      if (sess.access_token && Date.now() < expMs) {
         _accessToken = sess.access_token
         return _accessToken
       }
@@ -30,10 +33,14 @@ export function getAccessToken() {
 
 export function saveAuthSession(session) {
   _accessToken = session.access_token
+  // Supabase 的 expires_at 是秒级时间戳，需转毫秒再存，否则刷新后会被误判过期
+  const expiresAtMs = session.expires_at
+    ? session.expires_at * 1000
+    : Date.now() + (session.expires_in || 3600) * 1000
   localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
-    expires_at: session.expires_at || (Date.now() + (session.expires_in || 3600) * 1000)
+    expires_at: expiresAtMs
   }))
 }
 
