@@ -7,7 +7,36 @@
 
 import { SUPABASE_URL, SUPABASE_KEY } from '../utils/constants'
 
-let _cloudSyncing = false // 防递归
+let _cloudSyncing = false // 防递归（仅保留给 cloudSaveAll 兼容判断，见下）
+
+// ========== 云端写入串行队列 ==========
+// 背景：cloudSave 原用布尔锁防递归，并发调用时后到的请求会被直接丢弃（return false），
+// 导致批量删除时部分变更未持久化到云端，随后被 60s 轮询拉回旧数据覆盖本地。
+// 改造：同一字段（field）的写入进入串行队列，后者携带最新值覆盖前者；
+// 不同字段互不阻塞（tasks/logs 等各自独立队列）。
+const _saveQueues = new Map() // field -> Promise 链尾
+
+function enqueueSave(field, value) {
+  const prev = _saveQueues.get(field) || Promise.resolve()
+  const run = prev.then(async () => {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/kanban_data?id=eq.1`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ [field]: value, updated_at: new Date().toISOString() })
+    })
+    if (!res.ok) {
+      console.warn(`cloudSave(${field}) failed:`, res.status)
+      return false
+    }
+    return true
+  }).catch(e => {
+    console.warn(`cloudSave(${field}) error:`, e)
+    return false
+  })
+  // 无论成败，链尾继续接收后续写入；链异常不应阻断后续保存
+  _saveQueues.set(field, run.catch(() => {}))
+  return run
+}
 
 // ========== Auth 会话管理 ==========
 const AUTH_SESSION_KEY = 'szops_auth_session'
@@ -163,26 +192,18 @@ export async function cloudFetch(field) {
   }
 }
 
-// 写入单字段
+// 写入单字段（串行队列化：同字段并发时排队依次执行，不再丢弃）
 export async function cloudSave(field, value) {
-  if (_cloudSyncing) return false
-  _cloudSyncing = true
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/kanban_data?id=eq.1`, {
-      method: 'PATCH',
-      headers: authHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-      body: JSON.stringify({ [field]: value, updated_at: new Date().toISOString() })
-    })
-    return res.ok
-  } catch (e) {
-    console.warn('cloudSave error:', e)
-    return false
-  } finally {
-    _cloudSyncing = false
-  }
+  return enqueueSave(field, value)
 }
 
-// 批量写入四字段
+// 供 60s 轮询读取前调用：等待该字段队列中的待写请求全部落库，避免「写未完成→读回旧值」
+export async function waitForSaveQueue(field) {
+  const tail = _saveQueues.get(field)
+  if (tail) await tail
+}
+
+// 批量写入四字段（保留原布尔锁，调用点极少且为一次性全量写入）
 export async function cloudSaveAll(tasksVal, settingsVal, usersVal, logsVal) {
   if (_cloudSyncing) return false
   _cloudSyncing = true

@@ -118,7 +118,8 @@ onMounted(async () => {
   })
 
   setInterval(async () => {
-    await taskStore.cloudLoadTasks()
+    // 先等写入队列落库再读，避免删除保存尚未完成时读到云端旧数据拉回覆盖本地
+    await taskStore.cloudLoadTasks({ waitSave: true })
   }, 60000)
 })
 

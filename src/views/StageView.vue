@@ -196,7 +196,7 @@ async function batchDelete() {
   } catch (e) {
     return
   }
-  ids.forEach(id => taskStore.deleteTask(id))
+  taskStore.deleteTasks(ids)
   logStore.addLog('删除', `批量删除 ${ids.length} 个项目（${props.title}）：${names.join('、')}`, userStore.currentUser?.username || '系统')
   ElMessage.success(`已删除 ${ids.length} 个项目`)
   exitSelectMode()

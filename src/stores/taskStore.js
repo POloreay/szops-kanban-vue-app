@@ -3,7 +3,7 @@
 import { defineStore } from 'pinia'
 import { uid, isArchivedTask } from '../utils/business'
 import { STORAGE_KEY, IMPL_SUBS_PATH1, IMPL_SUBS_PATH2, STATUS_MAP, PRIORITY_KEYS } from '../utils/constants'
-import { cloudFetch, cloudSave } from '../api/supabase'
+import { cloudFetch, cloudSave, waitForSaveQueue } from '../api/supabase'
 
 export const useTaskStore = defineStore('task', {
   state: () => ({
@@ -73,8 +73,9 @@ export const useTaskStore = defineStore('task', {
       this._migrateSubStatus()
     },
 
-    // 云端加载
-    async cloudLoadTasks() {
+    // 云端加载（先等写入队列落库，避免读到旧值覆盖本地；仅轮询场景需要）
+    async cloudLoadTasks({ waitSave = false } = {}) {
+      if (waitSave) await waitForSaveQueue('tasks')
       const data = await cloudFetch('tasks')
       if (data !== null && data !== undefined) {
         this.tasks = data
@@ -141,6 +142,13 @@ export const useTaskStore = defineStore('task', {
     // 删除任务
     deleteTask(id) {
       this.tasks = this.tasks.filter(x => x.id !== id)
+      this.saveTasks()
+    },
+
+    // 批量删除：一次变更一次保存（避免 N 次 deleteTask 触发 N 个并发 cloudSave 互相排队/覆盖风险）
+    deleteTasks(ids) {
+      const set = new Set(ids)
+      this.tasks = this.tasks.filter(x => !set.has(x.id))
       this.saveTasks()
     },
 
