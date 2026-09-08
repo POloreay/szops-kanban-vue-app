@@ -77,6 +77,7 @@
               @keyup.enter="handleLogin"
             />
             <button class="b-btn" type="button" :disabled="loading" @click="handleLogin">{{ loading ? '登录中…' : '开工' }}</button>
+            <div v-if="loginError" class="b-err">{{ loginError }}</div>
             <div class="b-foot">我能抗住什么责任，我是个溜肩啊......</div>
           </div>
         </div>
@@ -138,10 +139,12 @@ watch(showLogin, (v) => {
 })
 
 const loading = ref(false)
+const loginError = ref('')
 
 async function handleLogin() {
+  loginError.value = ''
   if (!loginForm.value.username || !loginForm.value.password) {
-    ElMessage.warning('请输入用户名和密码')
+    loginError.value = '请输入用户名和密码'
     return
   }
   loading.value = true
@@ -149,14 +152,13 @@ async function handleLogin() {
     const ok = await userStore.login(loginForm.value.username, loginForm.value.password)
     if (ok) {
       showLogin.value = false
-      ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
       logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
       userStore.resumePending()
     } else {
-      ElMessage.error('用户名或密码错误')
+      loginError.value = '用户名或密码错误'
     }
   } catch (e) {
-    ElMessage.error(e.message || '登录失败，请稍后重试')
+    loginError.value = e.message || '登录失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -524,6 +526,18 @@ async function handleSync() {
   color: #9aa3af;
   margin-top: 16px;
   letter-spacing: 2px;
+}
+
+.b-err {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #e5484d;
+  line-height: 1.5;
+  background: #fdf0f0;
+  border: 1px solid #f5c6c8;
+  border-radius: 8px;
+  padding: 7px 10px;
+  word-break: break-all;
 }
 
 // 过渡动画

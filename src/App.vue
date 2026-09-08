@@ -95,8 +95,9 @@ function loadCloudData() {
 }
 
 onMounted(async () => {
-  userStore.restoreSession()
+  // 注意顺序：先加载本地用户缓存，再恢复登录态（否则 users 为空导致角色回退 user）
   userStore.getUsers()
+  userStore.restoreSession()
 
   taskStore.loadTasks()
   bidStore.loadBids()

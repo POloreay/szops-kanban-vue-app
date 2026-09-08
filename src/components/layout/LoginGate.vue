@@ -42,6 +42,7 @@
           @keyup.enter="handleLogin"
         />
         <button class="b-btn" type="button" :disabled="loading" @click="handleLogin">{{ loading ? '登录中…' : '开工' }}</button>
+        <div v-if="errorMsg" class="b-err">{{ errorMsg }}</div>
         <div class="b-foot">我能抗住什么责任，我是个溜肩啊......</div>
       </div>
     </div>
@@ -50,7 +51,6 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useUserStore } from '../../stores/userStore'
 import { useLogStore } from '../../stores/logStore'
 
@@ -59,24 +59,25 @@ const logStore = useLogStore()
 const loginForm = reactive({ username: '', password: '' })
 
 const loading = ref(false)
+const errorMsg = ref('')
 
 async function handleLogin() {
+  errorMsg.value = ''
   if (!loginForm.username || !loginForm.password) {
-    ElMessage.warning('请输入用户名和密码')
+    errorMsg.value = '请输入用户名和密码'
     return
   }
   loading.value = true
   try {
     const ok = await userStore.login(loginForm.username, loginForm.password)
     if (ok) {
-      ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
       logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
       userStore.resumePending()
     } else {
-      ElMessage.error('用户名或密码错误')
+      errorMsg.value = '用户名或密码错误'
     }
   } catch (e) {
-    ElMessage.error(e.message || '登录失败，请稍后重试')
+    errorMsg.value = e.message || '登录失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -291,5 +292,17 @@ async function handleLogin() {
   color: #9aa3af;
   margin-top: 16px;
   letter-spacing: 2px;
+}
+
+.b-err {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #e5484d;
+  line-height: 1.5;
+  background: #fdf0f0;
+  border: 1px solid #f5c6c8;
+  border-radius: 8px;
+  padding: 7px 10px;
+  word-break: break-all;
 }
 </style>

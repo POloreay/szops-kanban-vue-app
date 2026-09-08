@@ -6,7 +6,7 @@
 
 import { defineStore } from 'pinia'
 import { USER_KEY, SESSION_KEY } from '../utils/constants'
-import { cloudFetch, cloudSave, authLogin, authLogout, clearAuthSession, getAccessToken, toEmail } from '../api/supabase'
+import { cloudFetch, cloudSave, authLogin, authLogout, clearAuthSession, getAccessToken, toEmail, emailToUsername } from '../api/supabase'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -54,11 +54,13 @@ export const useUserStore = defineStore('user', {
     // 登录：走 Supabase Auth（网络错误向上抛，便于前端区分提示）
     async login(username, password) {
       const session = await authLogin(username, password)
-      // 角色优先从 Auth user_metadata 取（创建账号时写入），本地表兜底
+      // 角色/姓名解析：
+      // - 用户名优先：emailToUsername(email) 反查中文名（Auth metadata 中文可能乱码，不可靠）
+      // - 角色优先从 Auth user_metadata 取（创建账号时写入），本地表兜底
       const meta = session?.user?.user_metadata || {}
-      const local = this.users.find(x => x.username === username)
+      const local = this.users.find(x => x.username === username || x.username === emailToUsername(session?.user?.email))
       const role = meta.role || local?.role || 'user'
-      const name = meta.username || username
+      const name = emailToUsername(session?.user?.email) || meta.username || username
       this.currentUser = { username: name, role }
       localStorage.setItem(SESSION_KEY, JSON.stringify({ username: name }))
       return true

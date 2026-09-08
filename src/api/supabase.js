@@ -82,7 +82,17 @@ export async function authLogin(username, password) {
   if (!res.ok) {
     const body = {}
     try { Object.assign(body, await res.json()) } catch (e) {}
-    const msg = body.msg || body.error_description || body.error || '用户名或密码错误'
+    // 常见 Auth 错误码/文案翻译成中文，其余原样透出
+    const raw = body.msg || body.error_description || body.error || ''
+    const zhMap = {
+      'Invalid login credentials': '用户名或密码错误',
+      'invalid_credentials': '用户名或密码错误',
+      'Email not confirmed': '邮箱未确认，请联系管理员',
+      'User already registered': '该用户已存在',
+      'Password should be at least 6 characters': '密码至少需要 6 位字符',
+      'Signups not allowed for this instance': '该系统不允许自助注册'
+    }
+    const msg = zhMap[raw] || raw || '用户名或密码错误'
     throw new Error(msg)
   }
   const session = await res.json()
