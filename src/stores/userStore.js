@@ -51,14 +51,9 @@ export const useUserStore = defineStore('user', {
       cloudSave('users', this.users)
     },
 
-    // 登录：走 Supabase Auth
+    // 登录：走 Supabase Auth（网络错误向上抛，便于前端区分提示）
     async login(username, password) {
-      let session
-      try {
-        session = await authLogin(username, password)
-      } catch (e) {
-        return false
-      }
+      const session = await authLogin(username, password)
       // 角色优先从 Auth user_metadata 取（创建账号时写入），本地表兜底
       const meta = session?.user?.user_metadata || {}
       const local = this.users.find(x => x.username === username)

@@ -59,14 +59,26 @@ function authHeaders(extra = {}) {
   }
 }
 
-// 密码登录（password grant）
+// 密码登录（password grant），15 秒超时，网络错误与认证错误分开抛
 export async function authLogin(username, password) {
   const email = toEmail(username)
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15000)
+  let res
+  try {
+    res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal
+    })
+  } catch (e) {
+    clearTimeout(timer)
+    const err = new Error(e.name === 'AbortError' ? '登录请求超时（15秒无响应），请检查网络' : '无法连接认证服务器，请检查网络')
+    err.networkError = true
+    throw err
+  }
+  clearTimeout(timer)
   if (!res.ok) {
     const body = {}
     try { Object.assign(body, await res.json()) } catch (e) {}

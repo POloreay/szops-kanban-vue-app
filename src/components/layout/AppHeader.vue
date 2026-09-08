@@ -76,7 +76,7 @@
               autocomplete="current-password"
               @keyup.enter="handleLogin"
             />
-            <button class="b-btn" type="button" @click="handleLogin">开工</button>
+            <button class="b-btn" type="button" :disabled="loading" @click="handleLogin">{{ loading ? '登录中…' : '开工' }}</button>
             <div class="b-foot">我能抗住什么责任，我是个溜肩啊......</div>
           </div>
         </div>
@@ -155,6 +155,8 @@ async function handleLogin() {
     } else {
       ElMessage.error('用户名或密码错误')
     }
+  } catch (e) {
+    ElMessage.error(e.message || '登录失败，请稍后重试')
   } finally {
     loading.value = false
   }
