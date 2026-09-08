@@ -77,6 +77,23 @@ const logStore = useLogStore()
 const todoStore = useTodoStore()
 const targetStore = useTargetStore()
 
+// 云端数据拉取（统一入口：需已登录，请求携带 JWT）
+function loadCloudData() {
+  if (!userStore.currentUser) return
+  Promise.all([
+    taskStore.cloudLoadTasks(),
+    bidStore.cloudLoadBids(),
+    settingsStore.cloudLoadSettings(),
+    userStore.cloudLoadUsers(),
+    logStore.cloudLoadLogs(),
+    todoStore.cloudLoadTodos(),
+    targetStore.cloudLoadTargets()
+  ]).then(() => {
+    // 云端拉取后重跑迁移（防止云端还有未迁移的 bid 任务）
+    migrateBidTasks()
+  }).catch(e => console.warn('cloud load error:', e))
+}
+
 onMounted(async () => {
   userStore.restoreSession()
   userStore.getUsers()
@@ -92,18 +109,12 @@ onMounted(async () => {
   migrateBidTasks()
 
   // 云端数据后台静默拉取：不阻塞界面渲染（本地数据已先秒开显示）
-  Promise.all([
-    taskStore.cloudLoadTasks(),
-    bidStore.cloudLoadBids(),
-    settingsStore.cloudLoadSettings(),
-    userStore.cloudLoadUsers(),
-    logStore.cloudLoadLogs(),
-    todoStore.cloudLoadTodos(),
-    targetStore.cloudLoadTargets()
-  ]).then(() => {
-    // 云端拉取后重跑迁移（防止云端还有未迁移的 bid 任务）
-    migrateBidTasks()
-  }).catch(e => console.warn('cloud load error:', e))
+  loadCloudData()
+
+  // 登录态变化时重新拉云端（登录成功后 JWT 才可用）
+  watch(() => userStore.currentUser, (v, old) => {
+    if (v && !old) loadCloudData()
+  })
 
   setInterval(async () => {
     await taskStore.cloudLoadTasks()

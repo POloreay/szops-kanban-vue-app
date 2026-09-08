@@ -137,25 +137,32 @@ watch(showLogin, (v) => {
   }
 })
 
-function handleLogin() {
+const loading = ref(false)
+
+async function handleLogin() {
   if (!loginForm.value.username || !loginForm.value.password) {
     ElMessage.warning('请输入用户名和密码')
     return
   }
-  const ok = userStore.login(loginForm.value.username, loginForm.value.password)
-  if (ok) {
-    showLogin.value = false
-    ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
-    logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
-    userStore.resumePending()
-  } else {
-    ElMessage.error('用户名或密码错误')
+  loading.value = true
+  try {
+    const ok = await userStore.login(loginForm.value.username, loginForm.value.password)
+    if (ok) {
+      showLogin.value = false
+      ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
+      logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
+      userStore.resumePending()
+    } else {
+      ElMessage.error('用户名或密码错误')
+    }
+  } finally {
+    loading.value = false
   }
 }
 
-function handleLogout() {
+async function handleLogout() {
   logStore.addLog('退出', '用户 ' + userStore.currentUser.username + ' 退出系统', userStore.currentUser.username)
-  userStore.logout()
+  await userStore.logout()
   ElMessage.success('已退出登录')
 }
 

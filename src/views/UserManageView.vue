@@ -93,6 +93,7 @@ import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../stores/userStore'
 import { useLogStore } from '../stores/logStore'
+import { toEmail } from '../api/supabase'
 
 const userStore = useUserStore()
 const logStore = useLogStore()
@@ -108,7 +109,7 @@ function openAdd() {
   showAdd.value = true
 }
 
-function onAdd() {
+async function onAdd() {
   const { username, password, role } = addForm.value
   if (!username || !password) {
     ElMessage.warning('请填写用户名和初始密码')
@@ -118,11 +119,15 @@ function onAdd() {
     ElMessage.warning('密码至少 4 位')
     return
   }
-  const ok = userStore.addUser(username.trim(), password, role)
+  const ok = await userStore.addUser(username.trim(), password, role)
   if (ok) {
     logStore.addLog('用户管理', `新增用户 ${username.trim()}（${role === 'admin' ? '管理员' : '普通用户'}）`, userStore.currentUser?.username)
     showAdd.value = false
-    ElMessage.success(`用户 ${username.trim()} 已创建`)
+    ElMessageBox.alert(
+      `列表已记录「${username.trim()}」，但 Auth 登录账号需到 Supabase 控制台创建：Authentication → Users → Add user → 邮箱填 ${toEmail(username.trim())}，密码同上，并勾选 Auto Confirm User。`,
+      '还需一步：创建 Auth 账号',
+      { confirmButtonText: '知道了', type: 'warning' }
+    )
   } else {
     ElMessage.error('用户名已存在')
   }
@@ -140,17 +145,25 @@ function openReset(i) {
   showReset.value = true
 }
 
-function onReset() {
+async function onReset() {
   const t = resetTarget.value
   if (!t) return
   if (!resetPass.value || String(resetPass.value).length < 4) {
     ElMessage.warning('新密码至少 4 位')
     return
   }
-  userStore.editUserPass(resetIdx.value, resetPass.value)
-  logStore.addLog('用户管理', `重置用户 ${t.username} 的密码`, userStore.currentUser?.username)
-  showReset.value = false
-  ElMessage.success(`已重置 ${t.username} 的密码`)
+  const ok = await userStore.editUserPass(resetIdx.value, resetPass.value)
+  if (ok) {
+    logStore.addLog('用户管理', `重置用户 ${t.username} 的密码`, userStore.currentUser?.username)
+    showReset.value = false
+    ElMessageBox.alert(
+      `重置「${t.username}」的密码需到 Supabase 控制台操作：Authentication → Users → 找到该用户 → Reset password。`,
+      '还需一步：控制台重置密码',
+      { confirmButtonText: '知道了', type: 'warning' }
+    )
+  } else {
+    ElMessage.error('重置失败')
+  }
 }
 
 // 删除
@@ -166,10 +179,14 @@ async function onDelete(i) {
   } catch (e) {
     return
   }
-  const ok = userStore.deleteUser(i)
+  const ok = await userStore.deleteUser(i)
   if (ok) {
     logStore.addLog('用户管理', `删除用户 ${u.username}`, userStore.currentUser?.username)
-    ElMessage.success(`已删除用户 ${u.username}`)
+    ElMessageBox.alert(
+      `列表已移除「${u.username}」，Auth 账号需到 Supabase 控制台删除：Authentication → Users → 找到该用户 → Delete。`,
+      '还需一步：删除 Auth 账号',
+      { confirmButtonText: '知道了', type: 'warning' }
+    )
   } else {
     ElMessage.error('删除失败：管理员账号不可删除')
   }

@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../../stores/userStore'
 import { useLogStore } from '../../stores/logStore'
@@ -58,18 +58,25 @@ const userStore = useUserStore()
 const logStore = useLogStore()
 const loginForm = reactive({ username: '', password: '' })
 
-function handleLogin() {
+const loading = ref(false)
+
+async function handleLogin() {
   if (!loginForm.username || !loginForm.password) {
     ElMessage.warning('请输入用户名和密码')
     return
   }
-  const ok = userStore.login(loginForm.username, loginForm.password)
-  if (ok) {
-    ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
-    logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
-    userStore.resumePending()
-  } else {
-    ElMessage.error('用户名或密码错误')
+  loading.value = true
+  try {
+    const ok = await userStore.login(loginForm.username, loginForm.password)
+    if (ok) {
+      ElMessage.success('无敌牛马，欢迎回来！开工大吉，' + userStore.currentUser.username)
+      logStore.addLog('登录', '用户 ' + userStore.currentUser.username + ' 登录系统', userStore.currentUser.username)
+      userStore.resumePending()
+    } else {
+      ElMessage.error('用户名或密码错误')
+    }
+  } finally {
+    loading.value = false
   }
 }
 </script>
