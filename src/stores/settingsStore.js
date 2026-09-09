@@ -2,7 +2,7 @@
 
 import { defineStore } from 'pinia'
 import { SETTINGS_KEY } from '../utils/constants'
-import { cloudFetch, cloudSave } from '../api/supabase'
+import { cloudFetch, cloudSave, waitForSaveQueue } from '../api/supabase'
 
 const DEFAULT_SETTINGS = {
   bgType: 'color',
@@ -36,6 +36,7 @@ export const useSettingsStore = defineStore('settings', {
     },
 
     async cloudLoadSettings() {
+      await waitForSaveQueue('settings')
       const data = await cloudFetch('settings')
       if (data !== null && data !== undefined && Object.keys(data).length > 0) {
         this.settings = { ...DEFAULT_SETTINGS, ...data }

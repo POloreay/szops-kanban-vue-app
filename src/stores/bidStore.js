@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { uid } from '../utils/business'
 import { BID_STORAGE_KEY, BID_STAGES } from '../utils/constants'
-import { cloudFetch, cloudSave } from '../api/supabase'
+import { cloudFetch, cloudSave, waitForSaveQueue } from '../api/supabase'
 
 export const useBidStore = defineStore('bid', {
   state: () => ({
@@ -35,6 +35,8 @@ export const useBidStore = defineStore('bid', {
     },
 
     async cloudLoadBids() {
+      // 等待 settings 队列中的待写请求全部落库，避免「写未完成→读回旧值」覆盖本地新数据
+      await waitForSaveQueue('settings')
       const s = await cloudFetch('settings')
       if (s && Array.isArray(s.bidsData)) {
         this.bids = s.bidsData

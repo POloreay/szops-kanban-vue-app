@@ -2,7 +2,7 @@
 
 import { defineStore } from 'pinia'
 import { TODO_KEY } from '../utils/constants'
-import { cloudFetch, cloudSave } from '../api/supabase'
+import { cloudFetch, cloudSave, waitForSaveQueue } from '../api/supabase'
 import { uid } from '../utils/business'
 
 export const useTodoStore = defineStore('todo', {
@@ -32,6 +32,8 @@ export const useTodoStore = defineStore('todo', {
     },
 
     async cloudLoadTodos() {
+      // 等待 settings 队列中的待写请求全部落库，避免「写未完成→读回旧值」覆盖本地新数据
+      await waitForSaveQueue('settings')
       const s = await cloudFetch('settings')
       if (s && Array.isArray(s.todosData)) {
         this.todos = s.todosData

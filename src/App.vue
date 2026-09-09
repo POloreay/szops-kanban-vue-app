@@ -121,6 +121,9 @@ onMounted(async () => {
     await taskStore.cloudLoadTasks({ waitSave: true })
     // 同步用户角色（其他管理员将我设为/取消管理员后，60s 内自动生效）
     userStore.cloudLoadUsers()
+    // 同步待办和投标数据（cloudLoad内部已await waitForSaveQueue，防止读旧值覆盖）
+    todoStore.cloudLoadTodos()
+    bidStore.cloudLoadBids()
   }, 60000)
 })
 

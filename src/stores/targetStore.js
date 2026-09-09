@@ -4,7 +4,7 @@
 // 持久化：本地 TARGET_KEY + 云端 settings.targetsData（与 todosData 同机制）
 
 import { defineStore } from 'pinia'
-import { cloudFetch, cloudSave } from '../api/supabase'
+import { cloudFetch, cloudSave, waitForSaveQueue } from '../api/supabase'
 
 const TARGET_KEY = 'szops_targets_v2'
 const METRICS = ['planRevenue', 'grossRate', 'netProfit', 'budget']
@@ -57,6 +57,7 @@ export const useTargetStore = defineStore('target', {
     },
 
     async cloudLoadTargets() {
+      await waitForSaveQueue('settings')
       const s = await cloudFetch('settings')
       if (s && s.targetsData && typeof s.targetsData === 'object') {
         this.targets = s.targetsData

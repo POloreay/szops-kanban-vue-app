@@ -1,147 +1,153 @@
 <template>
   <div class="bid-view">
-    <!-- 导航已由左侧边栏「投标管理」子菜单承担（/bid 总览、/bid/{stage} 环节页） -->
-
     <!-- 未登录引导 -->
     <div v-if="!userStore.currentUser" class="panel empty-guide">
       <h3>请先登录</h3>
       <p>投标管理需要登录后使用，点击右上角「登录」。</p>
     </div>
 
-    <!-- ==================== 投标总览 ==================== -->
-    <template v-else-if="tab === 'overview'">
-      <!-- 第一行：各环节数量 + 合计金额（不含归档） -->
+    <template v-else>
+      <!-- ==================== 统计卡片行 ==================== -->
       <div class="ov-cards">
+        <!-- 在途合计（默认选中） -->
+        <div
+          class="ov-card total"
+          :class="{ active: curStage === 'all' }"
+          @click="setStage('all')"
+        >
+          <div class="nm">在途合计（不含归档）</div>
+          <div class="ct">{{ activeTotalCount }}<small>个</small></div>
+          <div class="am">{{ activeTotalAmountText }}</div>
+        </div>
+        <!-- 四个在途环节 -->
         <div
           v-for="s in ACTIVE_STAGES"
           :key="s"
           class="ov-card"
-          :class="s"
-          @click="goTab(s)"
+          :class="[s, { active: curStage === s }]"
+          @click="setStage(s)"
         >
-          <div class="ov-card-name">{{ BID_STAGES[s].name }}</div>
-          <div class="ov-card-count">{{ stageCounts[s] }}<span class="ov-unit">个</span></div>
-          <div class="ov-card-amount">{{ stageAmountText[s] }}</div>
+          <div class="nm">{{ BID_STAGES[s].name }}</div>
+          <div class="ct">{{ stageCounts[s] }}<small>个</small></div>
+          <div class="am">{{ stageAmountText[s] }}</div>
         </div>
-        <div class="ov-card ov-total">
-          <div class="ov-card-name">在途合计（不含归档）</div>
-          <div class="ov-card-count">{{ activeTotalCount }}<span class="ov-unit">个</span></div>
-          <div class="ov-card-amount">{{ activeTotalAmountText }}</div>
+        <!-- 归档任务 -->
+        <div
+          class="ov-card archive"
+          :class="{ active: curStage === 'archive' }"
+          @click="setStage('archive')"
+        >
+          <div class="nm">归档任务</div>
+          <div class="ct">{{ stageCounts['archive'] }}<small>个</small></div>
+          <div class="am">{{ archiveAmountText }}</div>
         </div>
       </div>
 
-      <!-- 第二行：处置时限紧迫度 TOP5（各环节前5，不含归档） -->
+      <!-- ==================== 任务卡片面板 ==================== -->
       <div class="panel">
-        <div class="panel-header">
+        <div class="panel-head">
           <div>
-            <h3 class="panel-title">处置时限紧迫榜 · TOP5</h3>
-            <div class="panel-subtitle">各环节按截止日期临近程度排序（已逾期置顶） · 不含归档 · 点击行查看详情</div>
+            <div class="panel-title">
+              <span class="bar" :style="{ background: titleBarColor }"></span>
+              环节明细 · {{ curStageName }}
+              <span class="cur-count">{{ sortedBids.length }} 条</span>
+            </div>
+            <div class="panel-sub" v-if="curStage !== 'archive'">点击卡片查看详情 · 卡片底色按紧迫度区分</div>
+            <div class="panel-sub" v-else>归档任务 · 可恢复或删除</div>
           </div>
-          <div class="stage-tools">
-            <select class="stage-select" v-model="ownerFilter">
+          <div class="panel-tools">
+            <!-- 排序切换（归档视图隐藏） -->
+            <div class="seg" v-if="curStage !== 'archive'">
+              <button
+                v-for="opt in SORT_OPTIONS"
+                :key="opt.key"
+                :class="{ on: curSort === opt.key }"
+                @click="curSort = opt.key"
+              >{{ opt.label }}</button>
+            </div>
+            <select class="owner-select" v-model="ownerFilter">
               <option value="">全部创建人</option>
               <option v-for="o in bidStore.owners" :key="o" :value="o">{{ o }}</option>
             </select>
-            <button v-if="userStore.currentUser" class="btn-del" @click="openNew">
+            <button class="btn-new" @click="openNew">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
               新建投标
             </button>
           </div>
         </div>
-        <table class="ds-table" v-if="urgentList.length">
-          <thead>
-            <tr><th style="width:110px">环节</th><th>项目/商机名称</th><th>子状态</th><th>创建人</th><th>预计金额(万元)</th><th>截止日期</th><th style="width:120px">处置时限</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="(r, i) in urgentList" :key="r.b.id" @click="openDetail(r.b)">
-              <td><span class="g-pill stage-pill" :class="r.stageKey"><span class="dot"></span>{{ BID_STAGES[r.b.stage || 'lead'].name }}</span></td>
-              <td class="cell-title" :title="r.b.title">{{ r.b.title || '未命名商机' }}</td>
-              <td class="cell-text">{{ r.b.subStatus || '—' }}</td>
-              <td class="cell-text">{{ r.b.owner || '—' }}</td>
-              <td class="num">{{ r.amountText }}</td>
-              <td class="cell-text mono">{{ r.b.deadline || '—' }}</td>
-              <td><span class="g-pill" :class="r.cls"><span class="dot"></span>{{ r.daysText }}</span></td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-else class="stage-empty show">当前无在途投标（不含归档）</div>
-      </div>
-    </template>
-
-    <!-- ==================== 各环节页 ==================== -->
-    <template v-else>
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h3 class="panel-title">{{ BID_STAGES[tab].name }} · {{ lists[tab].length }} 条</h3>
-            <div class="panel-subtitle">{{ stageSubtitle(tab) }}</div>
-          </div>
-          <div class="stage-tools">
-            <span class="stage-count">合计 {{ fmtWan(stageAmount(tab)) }} 万元</span>
-            <select class="stage-select" v-model="ownerFilter">
-              <option value="">全部创建人</option>
-              <option v-for="o in bidStore.owners" :key="o" :value="o">{{ o }}</option>
-            </select>
-            <button v-if="userStore.currentUser" class="btn-del" @click="openNew">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
-              新建投标
-            </button>
+        <div class="task-grid">
+          <div
+            v-for="(b, i) in sortedBids"
+            :key="b.id"
+            class="tcard"
+            :class="cardUrgencyClass(b)"
+            @click="openDetail(b)"
+          >
+            <div class="tcard-body">
+              <!-- 序号 -->
+              <div class="t-idx">{{ String(i + 1).padStart(2, '0') }}</div>
+              <!-- 项目名称 -->
+              <div class="t-title" :title="b.title">{{ b.title || '未命名商机' }}</div>
+              <!-- 紧迫度 / 归档结果 -->
+              <div v-if="curStage === 'archive'" class="t-urge t-urge-archive">{{ archiveResultText(b.subStatus) }}</div>
+              <div v-else class="t-urge">
+                <span v-if="urgencyOf(b).days === 0" class="star">★</span>
+                {{ urgeText(b) }}
+              </div>
+              <!-- 标签列 -->
+              <div class="t-tags">
+                <template v-if="curStage === 'archive'">
+                  <span class="pill" :class="archivePillClass(b.subStatus)"><span class="dot"></span>{{ b.subStatus || '—' }}</span>
+                  <span class="pill">{{ b.deadline || '—' }}</span>
+                </template>
+                <template v-else>
+                  <span class="pill" :class="b.stage || 'lead'"><span class="dot"></span>{{ BID_STAGES[b.stage || 'lead'].name }}</span>
+                  <span class="pill">{{ b.subStatus || '—' }}</span>
+                </template>
+              </div>
+              <!-- 金额 -->
+              <div class="t-info t-col-amt">
+                <span class="k">金额</span>
+                <span class="v mono">{{ amountText(b) }}</span>
+              </div>
+              <!-- 负责人 -->
+              <div class="t-info t-col-owner">
+                <span class="k">负责人</span>
+                <span class="v">{{ b.owner || '—' }}</span>
+              </div>
+              <!-- 截止/归档日期 -->
+              <div class="t-info t-col-dead">
+                <span class="k">{{ curStage === 'archive' ? '归档日期' : '截止' }}</span>
+                <span class="v mono">{{ b.deadline || '—' }}</span>
+              </div>
+              <!-- 操作区 -->
+              <div class="t-ops" @click.stop>
+                <!-- 归档视图：恢复 / 删除 -->
+                <template v-if="curStage === 'archive'">
+                  <button @click="onRestore(b)">恢复</button>
+                  <button v-if="canManage(b)" class="danger" @click="onDelete(b)">删除</button>
+                </template>
+                <!-- 开标准备：中标 / 落标 / 放弃 / 编辑 -->
+                <template v-else-if="(b.stage || 'lead') === 'opening'">
+                  <button class="good" @click="onResult(b, '中标归档')">中标</button>
+                  <button class="bad" @click="onResult(b, '落标归档')">落标</button>
+                  <button @click="onResult(b, '放弃归档')">放弃</button>
+                  <button v-if="canManage(b)" @click="openEdit(b)">编辑</button>
+                </template>
+                <!-- 其他环节：流转 / 放弃 / 编辑 -->
+                <template v-else>
+                  <select v-if="BID_NEXT[b.stage || 'lead']" class="flow-select" :value="''" @change="onMove(b, $event)">
+                    <option value="" disabled>流转→</option>
+                    <option :value="BID_NEXT[b.stage || 'lead']">进入「{{ BID_STAGES[BID_NEXT[b.stage || 'lead']].name }}」</option>
+                    <option value="__giveup">放弃投标（归档）</option>
+                  </select>
+                  <button v-if="canManage(b)" @click="openEdit(b)">编辑</button>
+                </template>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="stage-table-wrap">
-          <table class="ds-table">
-            <thead>
-              <tr>
-                <th style="width:50px">序号</th>
-                <th>项目/商机名称</th>
-                <th>子状态</th>
-                <th>创建人</th>
-                <th>预计金额(万元)</th>
-                <th v-if="tab === 'archive'">归档结果</th>
-                <th>截止日期</th>
-                <th style="width:120px">处置时限</th>
-                <th style="width:200px">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(b, i) in lists[tab]" :key="b.id" @click="openDetail(b)" :class="{ 'row-archived': tab === 'archive' }">
-                <td class="num row-idx">{{ String(i + 1).padStart(2, '0') }}</td>
-                <td class="cell-title" :title="b.title">{{ b.title || '未命名商机' }}</td>
-                <td class="cell-text">{{ b.subStatus || '—' }}</td>
-                <td class="cell-text">{{ b.owner || '—' }}</td>
-                <td class="num">{{ amountText(b) }}</td>
-                <td v-if="tab === 'archive'" class="cell-text">
-                  <span class="g-pill" :class="archivePill(b.subStatus)"><span class="dot"></span>{{ b.subStatus || '—' }}</span>
-                </td>
-                <td class="cell-text mono">{{ b.deadline || '—' }}</td>
-                <td><span class="g-pill" :class="deadlinePillClass(b)"><span class="dot"></span>{{ deadlineText(b) }}</span></td>
-                <td>
-                  <div class="row-ops" @click.stop>
-                    <!-- 流转：进入下一环节 -->
-                    <select v-if="BID_NEXT[tab]" class="bid-op-select" :value="''" @change="onMove(b, $event)">
-                      <option value="" disabled>流转到 →</option>
-                      <option :value="BID_NEXT[tab]">进入「{{ BID_STAGES[BID_NEXT[tab]].name }}」</option>
-                      <option value="__giveup">放弃投标（归档）</option>
-                    </select>
-                    <!-- opening：开标结果 -->
-                    <template v-else-if="tab === 'opening'">
-                      <button class="bid-op-btn good" @click="onResult(b, '中标归档')">中标</button>
-                      <button class="bid-op-btn bad" @click="onResult(b, '落标归档')">落标</button>
-                      <button class="bid-op-btn" @click="onResult(b, '放弃归档')">放弃</button>
-                    </template>
-                    <!-- archive：恢复或删除 -->
-                    <template v-else>
-                      <button class="bid-op-btn" @click="onRestore(b)">恢复</button>
-                      <button v-if="canManage(b)" class="bid-op-btn bad" @click="onDelete(b)">删除</button>
-                    </template>
-                    <button v-if="canManage(b) && tab !== 'archive'" class="bid-op-btn" @click="openEdit(b)">编辑</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="!lists[tab].length" class="stage-empty show">本环节暂无项目</div>
-        </div>
+        <div v-if="!sortedBids.length" class="empty">当前{{ curStage === 'archive' ? '归档' : '环节' }}暂无项目</div>
       </div>
     </template>
 
@@ -184,7 +190,6 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useBidStore } from '../stores/bidStore'
 import { useLogStore } from '../stores/logStore'
@@ -197,29 +202,41 @@ import BidFormModal from '../components/kanban/BidFormModal.vue'
 const bidStore = useBidStore()
 const logStore = useLogStore()
 const userStore = useUserStore()
-const route = useRoute()
-const router = useRouter()
 
 onMounted(() => bidStore.loadBids())
 
 const ownerFilter = ref('')
 
-// Tab 由路由驱动（与项目管理子页一致）：/bid = 总览，/bid/{stage} = 环节页
 const ACTIVE_STAGES = ['lead', 'signup', 'prepare', 'opening']
-const tab = computed(() => {
-  const m = route.path.match(/^\/bid\/(lead|signup|prepare|opening|archive)$/)
-  return m ? m[1] : 'overview'
-})
-function goTab(t) {
-  router.push(t === 'overview' ? '/bid' : `/bid/${t}`)
+const SORT_OPTIONS = [
+  { key: 'urgent', label: '紧迫度' },
+  { key: 'amount', label: '金额' },
+  { key: 'deadline', label: '截止日期' }
+]
+
+// 当前选中的环节：'all' = 全部在途，'archive' = 归档，其余为具体环节
+const curStage = ref('all')
+const curSort = ref('urgent')
+
+function setStage(s) {
+  curStage.value = s
 }
 
-const lists = computed(() => {
-  const r = {}
-  BID_STAGE_ORDER.forEach(s => {
-    r[s] = bidStore.bids.filter(b => (b.stage || 'lead') === s && (!ownerFilter.value || b.owner === ownerFilter.value))
-  })
-  return r
+const curStageName = computed(() => {
+  if (curStage.value === 'all') return '全部在途'
+  return BID_STAGES[curStage.value]?.name || '全部在途'
+})
+
+const titleBarColor = computed(() => {
+  const colors = {
+    all: 'var(--accent)',
+    lead: 'var(--biz-blue, #6366f1)',
+    signup: 'var(--chart-gold, #f59e0b)',
+    prepare: 'var(--biz-teal, #0d9488)',
+    opening: 'var(--chart-orange, #ea580c)',
+    archive: '#64748b'
+  }
+  return colors[curStage.value] || 'var(--accent)'
 })
 
 // 各环节数量（不受创建人筛选影响，反映全量）
@@ -232,7 +249,7 @@ const stageCounts = computed(() => {
 })
 
 // 各环节金额（万元，受创建人筛选影响，不含归档）
-const stageAmount = (s) => (lists.value[s] || []).reduce((a, b) => a + (Number(b.amount) > 0 ? Number(b.amount) : 0), 0)
+const stageAmount = (s) => (filteredBids.value[s] || []).reduce((a, b) => a + (Number(b.amount) > 0 ? Number(b.amount) : 0), 0)
 const stageAmountText = computed(() => {
   const r = {}
   ACTIVE_STAGES.forEach(s => {
@@ -241,55 +258,109 @@ const stageAmountText = computed(() => {
   })
   return r
 })
-const activeTotalCount = computed(() => ACTIVE_STAGES.reduce((a, s) => a + (lists.value[s]?.length || 0), 0))
+const activeTotalCount = computed(() => ACTIVE_STAGES.reduce((a, s) => a + (filteredBids.value[s]?.length || 0), 0))
 const activeTotalAmount = computed(() => ACTIVE_STAGES.reduce((a, s) => a + stageAmount(s), 0))
 const activeTotalAmountText = computed(() => {
   const v = activeTotalAmount.value
   return v > 0 ? fmtWan(v, 1) + ' 万元' : '暂无金额'
 })
 
-// 处置时限紧迫榜：四个在途环节各取 TOP5 按剩余天数升序（逾期在前），再整表按紧迫度排序截取前5
-const urgentList = computed(() => {
-  const rows = []
-  ACTIVE_STAGES.forEach(s => {
-    (lists.value[s] || []).forEach(b => {
-      if (!b.deadline) return
-      const d = getDaysLeft(b.deadline)
-      rows.push({ b, stageKey: s, days: d })
-    })
+// 归档金额
+const archiveAmount = computed(() =>
+  (filteredBids.value['archive'] || []).reduce((a, b) => a + (Number(b.amount) > 0 ? Number(b.amount) : 0), 0)
+)
+const archiveAmountText = computed(() => {
+  const v = archiveAmount.value
+  return v > 0 ? fmtWan(v, 1) + ' 万元' : '暂无金额'
+})
+
+// 按环节+ownerFilter过滤
+const filteredBids = computed(() => {
+  const r = {}
+  BID_STAGE_ORDER.forEach(s => {
+    r[s] = bidStore.bids.filter(b => (b.stage || 'lead') === s && (!ownerFilter.value || b.owner === ownerFilter.value))
   })
-  rows.sort((a, x) => a.days - x.days)
-  return rows.slice(0, 5).map(r => {
-    const d = r.days
-    return {
-      b: r.b,
-      stageKey: r.stageKey,
-      amountText: amountText(r.b),
-      daysText: d < 0 ? `已逾期 ${Math.abs(d)} 天` : `剩 ${d} 天`,
-      cls: d < 0 ? 'bad' : d <= 3 ? 'bad' : d <= 7 ? 'warn' : ''
+  return r
+})
+
+// 排序后的任务列表
+const sortedBids = computed(() => {
+  let list
+  if (curStage.value === 'all') {
+    // 全部在途（不含归档）
+    list = bidStore.bids.filter(b =>
+      (b.stage || 'lead') !== 'archive' && (!ownerFilter.value || b.owner === ownerFilter.value)
+    )
+  } else {
+    list = filteredBids.value[curStage.value] || []
+  }
+
+  // 归档：按截止日期倒序（最近归档的在前）
+  if (curStage.value === 'archive') {
+    return [...list].sort((a, b) => {
+      const da = a.deadline ? new Date(a.deadline).getTime() : 0
+      const db = b.deadline ? new Date(b.deadline).getTime() : 0
+      return db - da
+    })
+  }
+
+  // 在途：按选中排序方式
+  return [...list].sort((a, b) => {
+    if (curSort.value === 'amount') return (Number(b.amount) || 0) - (Number(a.amount) || 0)
+    if (curSort.value === 'deadline') {
+      const da = a.deadline ? getDaysLeft(a.deadline) : 99999
+      const db = b.deadline ? getDaysLeft(b.deadline) : 99999
+      return da - db
     }
+    // 紧迫度：逾期最前，然后剩余天数升序，无截止最后
+    const da = a.deadline ? getDaysLeft(a.deadline) : 99999
+    const db = b.deadline ? getDaysLeft(b.deadline) : 99999
+    return da - db
   })
 })
 
+// 紧迫度判定
+function urgencyOf(b) {
+  if (!b.deadline) return { key: 'none', days: null }
+  const d = getDaysLeft(b.deadline)
+  if (d < 0) return { key: 'bad', days: d }
+  if (d <= 3) return { key: 'bad', days: d }
+  if (d <= 5) return { key: 'warn', days: d }
+  return { key: 'normal', days: d }
+}
+
+function urgeText(b) {
+  if (!b.deadline) return '未设截止'
+  const d = getDaysLeft(b.deadline)
+  if (d < 0) return `逾期 ${Math.abs(d)} 天`
+  if (d === 0) return '今日到期'
+  return `剩 ${d} 天`
+}
+
+function cardUrgencyClass(b) {
+  if (curStage.value === 'archive') return 'archive'
+  return urgencyOf(b).key
+}
+
+function archiveResultText(sub) {
+  if (sub === '中标归档') return '中标'
+  if (sub === '落标归档') return '落标'
+  if (sub === '放弃归档') return '放弃'
+  return '已归档'
+}
+
 function amountText(b) {
   const v = Number(b.amount)
-  return v > 0 ? fmtWan(v, 1) : '—'
+  return v > 0 ? fmtWan(v, 1) + ' 万' : '—'
 }
 
-function stageSubtitle(s) {
-  const subs = BID_STAGES[s].subs
-  if (s === 'archive') return `归档结果：${subs.join(' / ')} · 可恢复或删除`
-  return `子状态：${subs.join(' / ')}`
-}
-
-function archivePill(sub) {
+function archivePillClass(sub) {
   if (sub === '中标归档') return 'good'
   if (sub === '落标归档') return 'bad'
   return 'warn'
 }
 
-// 权限（2026-09-08 调整）：投标管理模块所有用户拥有全部权限（编辑/删除不再限制创建人）
-const isAdmin = computed(() => userStore.isAdmin)
+// 权限（2026-09-08 调整）：投标管理模块所有用户拥有全部权限
 function canManage(_b) {
   return !!userStore.currentUser
 }
@@ -365,19 +436,6 @@ async function onDelete(b) {
 }
 
 // 样式工具
-function deadlinePillClass(b) {
-  if (!b.deadline) return ''
-  const d = getDaysLeft(b.deadline)
-  if (d < 0) return 'bad'
-  if (d <= 7) return 'warn'
-  return 'good'
-}
-function deadlineText(b) {
-  if (!b.deadline) return '未设截止'
-  const d = getDaysLeft(b.deadline)
-  if (d < 0) return `逾期 ${Math.abs(d)} 天`
-  return `剩 ${d} 天`
-}
 function fmtDateTime(s) {
   if (!s) return '—'
   const d = new Date(s)
@@ -394,11 +452,18 @@ function fmtDateTime(s) {
   min-height: 100%;
 }
 
-// 总览第一行：环节卡片
+.empty-guide {
+  text-align: center;
+  padding: var(--space-8) var(--space-6);
+  h3 { font-size: var(--text-base); margin-bottom: var(--space-2); }
+  p { color: var(--muted); font-size: 13px; }
+}
+
+/* ===== 统计卡片行 ===== */
 .ov-cards {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: var(--space-3);
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
 }
 @media (max-width: 1200px) {
   .ov-cards { grid-template-columns: repeat(3, 1fr); }
@@ -406,114 +471,171 @@ function fmtDateTime(s) {
 @media (max-width: 760px) {
   .ov-cards { grid-template-columns: repeat(2, 1fr); }
 }
+
 .ov-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-4);
+  padding: var(--space-4) 18px;
   cursor: pointer;
-  transition: all var(--motion-fast) var(--ease-standard);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   position: relative;
   overflow: hidden;
+  transition: all .18s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
 
   &::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 3px;
-    background: var(--stage-color, var(--accent));
+    background: var(--c, var(--accent));
   }
-  &.lead    { --stage-color: var(--biz-blue); }
-  &.signup  { --stage-color: var(--chart-gold); }
-  &.prepare { --stage-color: var(--biz-teal); }
-  &.opening { --stage-color: var(--chart-orange); }
-  &.ov-total { --stage-color: var(--accent); cursor: default; }
+
+  &.lead    { --c: var(--biz-blue, #6366f1); }
+  &.signup  { --c: var(--chart-gold, #f59e0b); }
+  &.prepare { --c: var(--biz-teal, #0d9488); }
+  &.opening { --c: var(--chart-orange, #ea580c); }
+  &.total   { --c: var(--accent); }
+  &.archive { --c: #64748b; }
 
   &:hover {
-    border-color: color-mix(in oklch, var(--stage-color, var(--accent)) 45%, transparent);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, .08);
+    border-color: color-mix(in oklch, var(--c, var(--accent)) 45%, transparent);
   }
-}
-.ov-card-name {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 500;
-}
-.ov-card-count {
-  font-size: 26px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  color: var(--fg);
-  line-height: 1.1;
+  &.active {
+    box-shadow: 0 0 0 2px var(--c, var(--accent)), 0 4px 12px rgba(15, 23, 42, .08);
+    border-color: var(--c, var(--accent));
+  }
 
-  .ov-unit {
+  .nm {
     font-size: 12px;
-    font-weight: 400;
     color: var(--muted);
-    margin-left: 4px;
+    font-weight: 500;
+  }
+  .ct {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--fg);
+    line-height: 1.2;
+    margin-top: 2px;
+
+    small {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--muted);
+      font-family: inherit;
+      margin-left: 3px;
+    }
+  }
+  .am {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    margin-top: 4px;
   }
 }
-.ov-card-amount {
-  font-size: 12px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+
+/* ===== Panel ===== */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
 }
 
-// 环节 pill 配色
-.stage-pill {
-  &.lead    .dot { background: var(--biz-blue); }
-  &.signup  .dot { background: var(--chart-gold); }
-  &.prepare .dot { background: var(--biz-teal); }
-  &.opening .dot { background: var(--chart-orange); }
-}
-
-// 表格行操作
-.row-ops {
+.panel-head {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .bar {
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+  .cur-count {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+}
+
+.panel-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
-.row-archived td { opacity: 0.72; }
-.row-idx { color: var(--muted); }
 
-.bid-op-select {
+/* 排序切换 */
+.seg {
+  display: inline-flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+
+  button {
+    border: none;
+    background: transparent;
+    padding: 5px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 500;
+    transition: all .15s;
+    font-family: inherit;
+
+    &.on {
+      background: var(--accent);
+      color: var(--accent-on);
+      box-shadow: 0 1px 3px color-mix(in oklch, var(--accent) 40%, transparent);
+    }
+  }
+}
+
+/* 创建人筛选 */
+.owner-select {
   font: inherit;
-  font-size: 11px;
-  padding: 3px 6px;
+  font-size: 12px;
+  padding: 4px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--fg);
   cursor: pointer;
 }
-.bid-op-btn {
-  font: inherit;
-  font-size: 11px;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--fg);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--motion-fast) var(--ease-standard);
 
-  &:hover { border-color: var(--accent); color: var(--accent); }
-  &.good:hover { border-color: var(--good); color: var(--good); }
-  &.bad:hover { border-color: var(--bad); color: var(--bad); }
-}
-
-// 主色按钮（与项目看板删除按钮同款）
-.btn-del {
+/* 新建按钮 */
+.btn-new {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   height: 30px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: none;
   border-radius: var(--radius-sm);
   background: var(--accent);
@@ -522,13 +644,266 @@ function fmtDateTime(s) {
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--motion-fast) var(--ease-standard);
+  transition: background .15s;
 
   svg { flex-shrink: 0; }
   &:hover { background: var(--primary-hover); }
 }
 
-// 弹窗（与全局弹窗同款）
+/* ===== 任务卡片网格 ===== */
+.task-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+/* 单行任务卡片 */
+.tcard {
+  position: relative;
+  border-radius: 11px;
+  border: 1px solid;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all .16s ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+  display: flex;
+  align-items: stretch;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .1);
+  }
+
+  /* 左侧通高侧边条 */
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--bc, var(--accent));
+    z-index: 1;
+  }
+
+  /* 紧迫度底色 */
+  &.bad {
+    background: color-mix(in srgb, #dc2626 6%, var(--surface));
+    border-color: color-mix(in srgb, #dc2626 30%, var(--border));
+    --bc: #dc2626;
+  }
+  &.warn {
+    background: color-mix(in srgb, #ea580c 6%, var(--surface));
+    border-color: color-mix(in srgb, #ea580c 30%, var(--border));
+    --bc: #ea580c;
+  }
+  &.normal {
+    background: color-mix(in srgb, #2563eb 4%, var(--surface));
+    border-color: color-mix(in srgb, #2563eb 25%, var(--border));
+    --bc: #2563eb;
+  }
+  &.none {
+    background: var(--surface);
+    border-color: var(--border);
+    --bc: var(--muted);
+  }
+  &.archive {
+    background: color-mix(in srgb, #64748b 4%, var(--surface));
+    border-color: var(--border);
+    --bc: #64748b;
+    opacity: .85;
+    &:hover { opacity: 1; }
+  }
+}
+
+.tcard-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 12px 10px 16px;
+  min-width: 0;
+}
+
+/* 序号列 */
+.t-idx {
+  flex: 0 0 36px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+  margin-right: 14px;
+}
+
+/* 标题列 */
+.t-title {
+  flex: 0 0 240px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 12px;
+}
+
+/* 紧迫度列 */
+.t-urge {
+  flex: 0 0 110px;
+  font-size: 15px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  line-height: 1.1;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  .star {
+    font-size: 13px;
+    color: #f59e0b;
+    animation: pulse 1.4s ease infinite;
+  }
+
+  .tcard.bad & { color: #dc2626; }
+  .tcard.warn & { color: #ea580c; }
+  .tcard.normal & { color: #059669; }
+  .tcard.none & {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+  }
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: .75; }
+}
+
+/* 归档视图紧迫度列 */
+.t-urge-archive {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 标签列 */
+.t-tags {
+  flex: 0 0 170px;
+  display: flex;
+  gap: 6px;
+  padding-right: 12px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 500;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  white-space: nowrap;
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c, var(--muted));
+  }
+
+  &.lead .dot { background: var(--biz-blue, #6366f1); }
+  &.signup .dot { background: var(--chart-gold, #f59e0b); }
+  &.prepare .dot { background: var(--biz-teal, #0d9488); }
+  &.opening .dot { background: var(--chart-orange, #ea580c); }
+
+  &.good {
+    background: color-mix(in srgb, #059669 8%, var(--surface));
+    border-color: color-mix(in srgb, #059669 30%, var(--border));
+    color: #059669;
+    .dot { background: #059669; }
+  }
+  &.bad {
+    background: color-mix(in srgb, #dc2626 8%, var(--surface));
+    border-color: color-mix(in srgb, #dc2626 30%, var(--border));
+    color: #dc2626;
+    .dot { background: #dc2626; }
+  }
+  &.warn {
+    background: color-mix(in srgb, #ea580c 8%, var(--surface));
+    border-color: color-mix(in srgb, #ea580c 30%, var(--border));
+    color: #ea580c;
+    .dot { background: #ea580c; }
+  }
+}
+
+/* 属性信息列 */
+.t-info {
+  font-size: 12px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  .k { color: var(--muted); font-size: 11px; }
+  .v {
+    font-weight: 600;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+  .v.mono { font-family: var(--font-mono); }
+}
+.t-col-amt { flex: 0 0 110px; padding-right: 12px; }
+.t-col-owner { flex: 0 0 90px; padding-right: 12px; }
+.t-col-dead { flex: 0 0 120px; padding-right: 12px; }
+
+/* 操作区 */
+.t-ops {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  align-items: center;
+  margin-left: auto;
+
+  button {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 11.5px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--muted);
+    transition: all .15s;
+    border-radius: 6px;
+    white-space: nowrap;
+
+    &:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    &.good:hover { border-color: #059669; color: #059669; }
+    &.bad:hover { border-color: #dc2626; color: #dc2626; }
+    &.danger:hover { border-color: #dc2626; color: #dc2626; }
+  }
+}
+
+.flow-select {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+
+  &:hover { border-color: var(--accent); color: var(--accent); }
+}
+
+/* ===== 弹窗 ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -611,8 +986,7 @@ function fmtDateTime(s) {
   white-space: pre-wrap;
 }
 
-.btn-secondary,
-.btn-primary {
+.btn-secondary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -623,21 +997,17 @@ function fmtDateTime(s) {
   cursor: pointer;
   white-space: nowrap;
   height: 34px;
-}
-
-.btn-primary {
-  border: none;
-  background: var(--accent);
-  color: var(--accent-on);
-
-  &:hover { background: var(--primary-hover); }
-}
-
-.btn-secondary {
   background: var(--surface);
   color: var(--fg);
   border: 1px solid var(--border);
 
   &:hover { border-color: color-mix(in oklch, var(--fg) 20%, transparent); }
+}
+
+.empty {
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
 }
 </style>
