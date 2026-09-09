@@ -50,7 +50,7 @@
             </div>
             <div class="form-grid-2">
               <div class="form-row"><label>项目代理服务费(元)</label><input class="form-input" v-model="form.agencyFee" type="number" min="0" step="0.01" placeholder="选填" /></div>
-              <div class="form-row"><label>预计金额(万元)</label><input class="form-input" v-model="form.amountWan" type="number" min="0" step="0.1" placeholder="选填，如 120.5" /></div>
+              <div class="form-row"><label>预计金额(万元)</label><input class="form-input" v-model="form.amountWan" type="number" min="0" step="0.01" placeholder="选填，如 120.56" /></div>
             </div>
           </div>
           <div class="modal-footer">

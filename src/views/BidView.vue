@@ -174,7 +174,7 @@
               <div class="detail-item"><span class="detail-label">联系人</span><span>{{ detailBid.contact || '—' }}</span></div>
               <div class="detail-item"><span class="detail-label">优先级</span><span>{{ PRIORITY_NAMES[detailBid.priority] || '中' }}</span></div>
               <div class="detail-item"><span class="detail-label">截止日期</span><span class="mono">{{ detailBid.deadline || '—' }}</span></div>
-              <div class="detail-item" v-if="detailBid.amount !== '' && detailBid.amount != null && detailBid.amount > 0"><span class="detail-label">预计金额</span><span class="mono">{{ fmtWan(detailBid.amount) }} 万元</span></div>
+              <div class="detail-item" v-if="detailBid.amount !== '' && detailBid.amount != null && detailBid.amount > 0"><span class="detail-label">预计金额</span><span class="mono">{{ fmtWan(detailBid.amount, 2) }} 万元</span></div>
               <div class="detail-item" v-if="detailBid.agencyFee"><span class="detail-label">代理服务费(元)</span><span class="mono">{{ fmtMoney(detailBid.agencyFee) }}</span></div>
               <div class="detail-item"><span class="detail-label">创建时间</span><span class="mono">{{ fmtDateTime(detailBid.createdAt) }}</span></div>
             </div>
@@ -255,7 +255,7 @@ const stageAmountText = computed(() => {
   const r = {}
   ACTIVE_STAGES.forEach(s => {
     const v = stageAmount(s)
-    r[s] = v > 0 ? fmtWan(v, 1) + ' 万元' : '暂无金额'
+    r[s] = v > 0 ? fmtWan(v, 2) + ' 万元' : '暂无金额'
   })
   return r
 })
@@ -263,7 +263,7 @@ const activeTotalCount = computed(() => ACTIVE_STAGES.reduce((a, s) => a + (filt
 const activeTotalAmount = computed(() => ACTIVE_STAGES.reduce((a, s) => a + stageAmount(s), 0))
 const activeTotalAmountText = computed(() => {
   const v = activeTotalAmount.value
-  return v > 0 ? fmtWan(v, 1) + ' 万元' : '暂无金额'
+  return v > 0 ? fmtWan(v, 2) + ' 万元' : '暂无金额'
 })
 
 // 归档金额
@@ -272,7 +272,7 @@ const archiveAmount = computed(() =>
 )
 const archiveAmountText = computed(() => {
   const v = archiveAmount.value
-  return v > 0 ? fmtWan(v, 1) + ' 万元' : '暂无金额'
+  return v > 0 ? fmtWan(v, 2) + ' 万元' : '暂无金额'
 })
 
 // 按环节+ownerFilter过滤
@@ -352,7 +352,7 @@ function archiveResultText(sub) {
 
 function amountText(b) {
   const v = Number(b.amount)
-  return v > 0 ? fmtWan(v, 1) + ' 万' : '—'
+  return v > 0 ? fmtWan(v, 2) + ' 万' : '—'
 }
 
 function archivePillClass(sub) {
