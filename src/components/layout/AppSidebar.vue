@@ -80,15 +80,14 @@ defineEmits(['toggle'])
 
 const route = useRoute()
 const userStore = useUserStore()
-// 分组展开状态：kanban / bid 各自独立
-const groupOpen = ref({ kanban: false, bid: false })
+// 分组展开状态：kanban
+const groupOpen = ref({ kanban: false })
 
 const currentPath = computed(() => route.path)
 
 // 任一子路由激活时对应分组自动展开
 const activeGroup = computed(() => {
   if (currentPath.value.startsWith('/kanban/')) return 'kanban'
-  if (currentPath.value.startsWith('/bid/')) return 'bid'
   return ''
 })
 watchEffect(() => {
@@ -137,14 +136,7 @@ const navGroups = computed(() => {
         {
           path: '/bid',
           label: '投标管理',
-          iconComp: iconBid,
-          children: [
-            { path: '/bid/lead', label: '商机跟踪' },
-            { path: '/bid/signup', label: '报名准备' },
-            { path: '/bid/prepare', label: '投标准备' },
-            { path: '/bid/opening', label: '开标准备' },
-            { path: '/bid/archive', label: '归档任务' }
-          ]
+          iconComp: iconBid
         },
         {
           path: '/kanban',

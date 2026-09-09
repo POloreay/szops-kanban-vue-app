@@ -122,8 +122,9 @@
               </div>
               <!-- 操作区 -->
               <div class="t-ops" @click.stop>
-                <!-- 归档视图：恢复 / 删除 -->
+                <!-- 归档视图：编辑 / 恢复 / 删除 -->
                 <template v-if="curStage === 'archive'">
+                  <button v-if="canManage(b)" @click="openEdit(b)">编辑</button>
                   <button @click="onRestore(b)">恢复</button>
                   <button v-if="canManage(b)" class="danger" @click="onDelete(b)">删除</button>
                 </template>
@@ -722,6 +723,7 @@ function fmtDateTime(s) {
   gap: 0;
   padding: 10px 12px 10px 16px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 /* 序号列 */
@@ -742,10 +744,15 @@ function fmtDateTime(s) {
   font-weight: 600;
   line-height: 1.4;
   color: var(--fg);
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-all;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   padding-right: 12px;
+  max-height: 3em;
 }
 
 /* 紧迫度列 */
