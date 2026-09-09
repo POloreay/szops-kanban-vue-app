@@ -43,6 +43,8 @@ export const useUserStore = defineStore('user', {
       if (data !== null && data !== undefined && Array.isArray(data) && data.length > 0) {
         this.users = data
         localStorage.setItem(USER_KEY, JSON.stringify(data))
+        // 云端用户表可能被其他管理员更新（如设为管理员），同步当前登录用户角色
+        this.syncCurrentRole()
       }
     },
 
@@ -54,13 +56,14 @@ export const useUserStore = defineStore('user', {
     // 登录：走 Supabase Auth（网络错误向上抛，便于前端区分提示）
     async login(username, password) {
       const session = await authLogin(username, password)
-      // 角色/姓名解析：
+      // 角色/姓名解析（2026-09-08 权限体系调整）：
       // - 用户名优先：emailToUsername(email) 反查中文名（Auth metadata 中文可能乱码，不可靠）
-      // - 角色优先从 Auth user_metadata 取（创建账号时写入），本地表兜底
+      // - 角色优先从本地/云端 users 表取（管理员可在用户管理页动态设为管理员），
+      //   Auth user_metadata.role 仅作兼容兑底（创建账号时写入，可能已过时）
       const meta = session?.user?.user_metadata || {}
-      const local = this.users.find(x => x.username === username || x.username === emailToUsername(session?.user?.email))
-      const role = meta.role || local?.role || 'user'
       const name = emailToUsername(session?.user?.email) || meta.username || username
+      const local = this.users.find(x => x.username === name || x.username === username)
+      const role = local?.role || meta.role || 'user'
       this.currentUser = { username: name, role }
       localStorage.setItem(SESSION_KEY, JSON.stringify({ username: name }))
       return true
@@ -137,6 +140,31 @@ export const useUserStore = defineStore('user', {
       this.users.splice(idx, 1)
       this.saveUsers()
       return true
+    },
+
+    // 设为管理员 / 取消管理员（2026-09-08 需求 5：支持添加某一用户为管理员）
+    // 仅改本地+云端 users 表的 role；Auth metadata 不动（角色解析已改为本地/云端优先）
+    async setUserRole(idx, role) {
+      const u = this.users[idx]
+      if (!u || !['admin', 'user'].includes(role)) return false
+      if (u.role === role) return true
+      u.role = role
+      this.saveUsers()
+      // 若改的是当前登录用户自己，同步刷新本地登录态角色（立即生效）
+      if (this.currentUser?.username === u.username) {
+        this.currentUser = { ...this.currentUser, role }
+      }
+      return true
+    },
+
+    // 同步登录态角色（轮询时调用：其他管理员改了我的角色，刷新后生效）
+    syncCurrentRole() {
+      if (!this.currentUser) return
+      const u = this.users.find(x => x.username === this.currentUser.username)
+      const role = u?.role || 'user'
+      if (role !== this.currentUser.role) {
+        this.currentUser = { ...this.currentUser, role }
+      }
     },
 
     // ===== Auth admin API 封装 =====

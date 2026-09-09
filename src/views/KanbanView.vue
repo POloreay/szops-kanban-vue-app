@@ -165,6 +165,7 @@ import {
   riskList, yearOptions, planOverdue
 } from '../utils/finance'
 import { fmtMoney } from '../utils/business'
+import { canManageTask } from '../utils/permissions'
 import TaskFormModal from '../components/kanban/TaskFormModal.vue'
 import AnalysisPanel from '../components/kanban/AnalysisPanel.vue'
 
@@ -174,12 +175,10 @@ const userStore = useUserStore()
 const openDrawer = inject('openTaskDrawer', () => {})
 const showNewTask = ref(false)
 
-// 权限：创建人本人或管理员可管理
+// 权限（2026-09-08 调整）：管理员全局可管；普通用户对自己负责的项目（pmName=本人）或自己创建的项目可管，其余只读
 const isAdmin = computed(() => userStore.isAdmin)
 function canManage(t) {
-  if (isAdmin.value) return true
-  const me = userStore.currentUser?.username
-  return !!me && t.owner === me
+  return canManageTask(t, userStore.currentUser)
 }
 
 // 单条删除（仅本人创建或管理员）

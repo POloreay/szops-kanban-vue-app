@@ -12,7 +12,7 @@
         <div class="panel-header">
           <div>
             <h3 class="panel-title">用户管理</h3>
-            <div class="panel-subtitle">共 {{ users.length }} 个账号 · 管理员可新增账号、重置密码、删除普通用户</div>
+            <div class="panel-subtitle">共 {{ users.length }} 个账号 · 管理员可新增账号、设为/取消管理员、重置密码、删除普通用户</div>
           </div>
           <div class="actions">
             <button class="btn-uni" @click="openAdd">
@@ -41,6 +41,8 @@
               <td class="cell-text muted">{{ fmtTime(u.createdAt) }}</td>
               <td>
                 <div class="row-actions">
+                  <button v-if="u.role !== 'admin'" class="btn-icon-text admin" @click="onSetAdmin(i)">设为管理员</button>
+                  <button v-else class="btn-icon-text" @click="onUnsetAdmin(i)">取消管理员</button>
                   <button class="btn-icon-text" @click="openReset(i)">重置密码</button>
                   <button class="btn-icon-text danger" :disabled="u.role === 'admin'" :title="u.role === 'admin' ? '管理员账号不可删除' : ''" @click="onDelete(i)">删除</button>
                 </div>
@@ -192,6 +194,51 @@ async function onDelete(i) {
   }
 }
 
+// 设为管理员（2026-09-08 需求 5）
+async function onSetAdmin(i) {
+  const u = users.value[i]
+  if (!u || u.role === 'admin') return
+  try {
+    await ElMessageBox.confirm(
+      `确定将「${u.username}」设为管理员吗？设为后其拥有全局增删改查、可读可写的全部操作权限。`,
+      '设为管理员',
+      { confirmButtonText: '确认提升', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch (e) {
+    return
+  }
+  const ok = await userStore.setUserRole(i, 'admin')
+  if (ok) {
+    logStore.addLog('用户管理', `将用户 ${u.username} 提升为管理员`, userStore.currentUser?.username)
+    ElMessage.success(`已将「${u.username}」设为管理员，权限立即生效（若对方已登录，稍后自动同步）`)
+  } else {
+    ElMessage.error('设置失败')
+  }
+}
+
+// 取消管理员
+async function onUnsetAdmin(i) {
+  const u = users.value[i]
+  if (!u || u.role !== 'admin') return
+  const isSelf = userStore.currentUser?.username === u.username
+  try {
+    await ElMessageBox.confirm(
+      `确定取消「${u.username}」的管理员权限吗？取消后其仅保留普通用户权限（仅可管理自己负责的项目）。${isSelf ? '\n\n注意：您正在取消自己的管理员权限，取消后您将无法再管理用户。' : ''}`,
+      '取消管理员',
+      { confirmButtonText: '确认取消', cancelButtonText: '返回', type: 'warning' }
+    )
+  } catch (e) {
+    return
+  }
+  const ok = await userStore.setUserRole(i, 'user')
+  if (ok) {
+    logStore.addLog('用户管理', `取消用户 ${u.username} 的管理员权限`, userStore.currentUser?.username)
+    ElMessage.success(`已取消「${u.username}」的管理员权限`)
+  } else {
+    ElMessage.error('设置失败')
+  }
+}
+
 function fmtTime(s) {
   if (!s) return '—'
   const d = new Date(s)
@@ -282,6 +329,8 @@ function fmtTime(s) {
   transition: background var(--motion-fast) var(--ease-standard);
 
   &:hover { background: var(--accent-soft); }
+  &.admin { color: var(--chart-gold); font-weight: 500; }
+  &.admin:hover { background: color-mix(in oklch, var(--chart-gold) 12%, transparent); }
   &.danger { color: var(--bad); }
   &.danger:hover { background: color-mix(in oklch, var(--bad) 8%, transparent); }
   &:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.55; }

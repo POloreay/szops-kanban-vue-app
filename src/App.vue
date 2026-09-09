@@ -33,6 +33,7 @@ import { useSettingsStore } from './stores/settingsStore'
 import { useLogStore } from './stores/logStore'
 import { useTodoStore } from './stores/todoStore'
 import { useTargetStore } from './stores/targetStore'
+import { canManageTask } from './utils/permissions'
 
 const collapsed = ref(false)
 const showNewTask = ref(false)
@@ -45,15 +46,13 @@ provide('openTaskDrawer', openTaskDrawer)
 
 // 全局编辑模态框（详情抽屉「编辑」按钮触发）
 function openEditModal(task) {
-  // 权限：仅创建人本人或管理员可编辑
-  const me = userStore.currentUser?.username
-  const allowed = userStore.isAdmin || (me && task.owner === me)
+  // 权限（2026-09-08 调整）：管理员全局可编辑；普通用户仅对自己负责（pmName=本人）或自己创建的项目可编辑
   if (!userStore.currentUser) {
     userStore.requireLogin(() => openEditModal(task))
     return
   }
-  if (!allowed) {
-    ElMessage.warning('仅创建人或管理员可编辑该项目')
+  if (!canManageTask(task, userStore.currentUser)) {
+    ElMessage.warning('仅项目经理本人或管理员可编辑该项目')
     return
   }
   editingTask.value = task
@@ -120,6 +119,8 @@ onMounted(async () => {
   setInterval(async () => {
     // 先等写入队列落库再读，避免删除保存尚未完成时读到云端旧数据拉回覆盖本地
     await taskStore.cloudLoadTasks({ waitSave: true })
+    // 同步用户角色（其他管理员将我设为/取消管理员后，60s 内自动生效）
+    userStore.cloudLoadUsers()
   }, 60000)
 })
 

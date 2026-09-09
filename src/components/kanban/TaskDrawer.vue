@@ -132,6 +132,7 @@ import { fmtMoney } from '../../utils/business'
 import { useTaskStore } from '../../stores/taskStore'
 import { useLogStore } from '../../stores/logStore'
 import { useUserStore } from '../../stores/userStore'
+import { canManageTask } from '../../utils/permissions'
 
 const props = defineProps({
   task: { type: Object, default: null }
@@ -143,13 +144,11 @@ const logStore = useLogStore()
 const userStore = useUserStore()
 const openEditModal = inject('openEditModal', null)
 
-// 权限：创建人本人或管理员可编辑
+// 权限（2026-09-08 调整）：管理员全局可编辑；普通用户仅对自己负责（pmName=本人）或自己创建的项目可编辑
 const isAdmin = computed(() => userStore.isAdmin)
 const canEdit = computed(() => {
   if (!props.task) return false
-  if (isAdmin.value) return true
-  const me = userStore.currentUser?.username
-  return !!me && props.task.owner === me
+  return canManageTask(props.task, userStore.currentUser)
 })
 
 const visible = ref(false)

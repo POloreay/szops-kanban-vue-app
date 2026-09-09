@@ -421,6 +421,10 @@ function onSubmit() {
       subStatus: statusKey === 'impl' ? '' : subStatus,
       projectInfo: quick
     }
+    // 权限体系（2026-09-08）：普通用户按 pmName 判断项目归属 → 手动新建时未填项目经理则默认为当前用户
+    if (!String(quick.pmName || '').trim() && userStore.currentUser?.username) {
+      payload.projectInfo = { ...quick, pmName: userStore.currentUser.username }
+    }
     taskStore.addTask(payload)
     logStore.addLog('新建', `创建项目「${title}」`, userStore.currentUser?.username || '系统')
     ElMessage.success('项目创建成功')

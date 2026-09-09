@@ -118,6 +118,7 @@ import { useUserStore } from '../stores/userStore'
 import { PRIORITY_NAMES } from '../utils/constants'
 import { isArchivedTask, isClosedProject, isAnyArchived, fmtDate } from '../utils/business'
 import { activeTasks, matchYearMonth, contractAmountOf, fmtWan, yearOptions } from '../utils/finance'
+import { canManageTask } from '../utils/permissions'
 import TaskFormModal from '../components/kanban/TaskFormModal.vue'
 
 const props = defineProps({
@@ -137,14 +138,12 @@ const userStore = useUserStore()
 const openDrawer = inject('openTaskDrawer', () => {})
 const showNewTask = ref(false)
 
-// 权限：创建人本人或管理员可管理
+// 权限（2026-09-08 调整）：管理员全局可管；普通用户对自己负责的项目（pmName=本人）或自己创建的项目可管，其余只读
 const isAdmin = computed(() => userStore.isAdmin)
 function canManage(t) {
-  if (isAdmin.value) return true
-  const me = userStore.currentUser?.username
-  return !!me && t.owner === me
+  return canManageTask(t, userStore.currentUser)
 }
-const canManageAny = computed(() => isAdmin.value || stageTasks.value.some(t => t.owner === userStore.currentUser?.username))
+const canManageAny = computed(() => isAdmin.value || stageTasks.value.some(t => canManageTask(t, userStore.currentUser)))
 
 // ===== 批量删除：选择模式 =====
 const selectMode = ref(false)

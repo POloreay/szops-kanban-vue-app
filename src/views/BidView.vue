@@ -288,12 +288,10 @@ function archivePill(sub) {
   return 'warn'
 }
 
-// 权限：创建人本人或管理员
+// 权限（2026-09-08 调整）：投标管理模块所有用户拥有全部权限（编辑/删除不再限制创建人）
 const isAdmin = computed(() => userStore.isAdmin)
-function canManage(b) {
-  if (isAdmin.value) return true
-  const me = userStore.currentUser?.username
-  return !!me && b.owner === me
+function canManage(_b) {
+  return !!userStore.currentUser
 }
 
 // 新建/编辑
